@@ -1,0 +1,1095 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Account Book</title>
+    <link rel="manifest" href="./manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=1" />
+    <meta name="theme-color" content="#f4f5f8" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="./styles.css?v=10" />
+  </head>
+  <body>
+    <!-- SVG icon sprite (Lucide-style). Referenced via <svg class="icon"><use href="#i-NAME"></use></svg> -->
+    <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
+      <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></symbol>
+      <symbol id="i-wallet" viewBox="0 0 24 24"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4Z"/></symbol>
+      <symbol id="i-edit" viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></symbol>
+      <symbol id="i-list" viewBox="0 0 24 24"><line x1="8" x2="21" y1="6" y2="6"/><line x1="8" x2="21" y1="12" y2="12"/><line x1="8" x2="21" y1="18" y2="18"/><line x1="3" x2="3.01" y1="6" y2="6"/><line x1="3" x2="3.01" y1="12" y2="12"/><line x1="3" x2="3.01" y1="18" y2="18"/></symbol>
+      <symbol id="i-landmark" viewBox="0 0 24 24"><line x1="3" x2="21" y1="22" y2="22"/><line x1="6" x2="6" y1="18" y2="11"/><line x1="10" x2="10" y1="18" y2="11"/><line x1="14" x2="14" y1="18" y2="11"/><line x1="18" x2="18" y1="18" y2="11"/><polygon points="12 2 20 7 4 7"/></symbol>
+      <symbol id="i-chart" viewBox="0 0 24 24"><line x1="18" x2="18" y1="20" y2="10"/><line x1="12" x2="12" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="14"/></symbol>
+      <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1 .23 2.23 1.5 3.5A4.61 4.61 0 0 1 8.91 14"/></symbol>
+      <symbol id="i-home" viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></symbol>
+      <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></symbol>
+      <symbol id="i-repeat" viewBox="0 0 24 24"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></symbol>
+      <symbol id="i-card" viewBox="0 0 24 24"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></symbol>
+      <symbol id="i-tv" viewBox="0 0 24 24"><rect width="20" height="15" x="2" y="7" rx="2"/><polyline points="17 2 12 7 7 2"/></symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></symbol>
+      <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
+      <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
+      <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></symbol>
+      <symbol id="i-up" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+      <symbol id="i-down" viewBox="0 0 24 24"><polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/></symbol>
+      <symbol id="i-gem" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M11 3 8 9l4 13 4-13-3-6"/><path d="M2 9h20"/></symbol>
+      <symbol id="i-check" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></symbol>
+      <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></symbol>
+      <symbol id="i-warn" viewBox="0 0 24 24"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></symbol>
+      <symbol id="i-send" viewBox="0 0 24 24"><line x1="22" x2="11" y1="2" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></symbol>
+      <symbol id="i-mic" viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" x2="12" y1="19" y2="22"/></symbol>
+      <symbol id="i-camera" viewBox="0 0 24 24"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></symbol>
+      <symbol id="i-paperclip" viewBox="0 0 24 24"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></symbol>
+      <symbol id="i-calendar" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="4" rx="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></symbol>
+      <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></symbol>
+      <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></symbol>
+      <symbol id="i-box" viewBox="0 0 24 24"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><polyline points="3.3 7 12 12 20.7 7"/><line x1="12" x2="12" y1="22" y2="12"/></symbol>
+      <symbol id="i-zap" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></symbol>
+      <symbol id="i-hourglass" viewBox="0 0 24 24"><path d="M5 22h14"/><path d="M5 2h14"/><path d="M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22"/><path d="M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2"/></symbol>
+      <symbol id="i-play" viewBox="0 0 24 24"><polygon points="6 3 20 12 6 21 6 3"/></symbol>
+      <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></symbol>
+      <symbol id="i-file-text" viewBox="0 0 24 24"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><polyline points="14 2 14 8 20 8"/><line x1="16" x2="8" y1="13" y2="13"/><line x1="16" x2="8" y1="17" y2="17"/><line x1="10" x2="8" y1="9" y2="9"/></symbol>
+      <symbol id="i-folder" viewBox="0 0 24 24"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></symbol>
+      <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/></symbol>
+      <symbol id="i-gift" viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13"/><path d="M19 12v7a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5A4.8 8 0 0 1 12 8a4.8 8 0 0 1 4.5-5 2.5 2.5 0 0 1 0 5"/></symbol>
+      <symbol id="i-arrow-up" viewBox="0 0 24 24"><line x1="12" x2="12" y1="19" y2="5"/><polyline points="5 12 12 5 19 12"/></symbol>
+      <symbol id="i-arrow-down" viewBox="0 0 24 24"><line x1="12" x2="12" y1="5" y2="19"/><polyline points="19 12 12 19 5 12"/></symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="5" x2="19" y1="12" y2="12"/><polyline points="12 5 19 12 12 19"/></symbol>
+      <symbol id="i-activity" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
+      <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
+      <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+    </defs></svg>
+
+    <header class="app-header">
+      <div class="container">
+        <div class="header-left">
+          <button id="menuBtn" class="btn btn-secondary menu-btn" type="button" title="Menu"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
+          <h1><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>Account Book</h1>
+        </div>
+        <div class="header-right">
+          <div id="authStatus" class="muted small">Connecting…</div>
+          <button id="themeToggleBtn" class="btn btn-secondary" type="button" aria-pressed="false" title="Toggle dark mode"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
+          <button id="signOutBtn" class="btn btn-secondary" type="button" disabled>Sign out</button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Sidebar Navigation -->
+    <div id="sidebarOverlay" class="sidebar-overlay" hidden></div>
+    <nav id="sidebar" class="sidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <h2><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>Menu</h2>
+        <button id="closeSidebar" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+      </div>
+      <div class="sidebar-nav">
+        <button class="sidebar-item active" data-view="record" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg></span>
+          <span>Add Record</span>
+        </button>
+        <button class="sidebar-item" data-view="records" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg></span>
+          <span>Record List</span>
+        </button>
+        <button class="sidebar-item" data-view="budget" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-landmark"></use></svg></span>
+          <span>Budget</span>
+        </button>
+        <button class="sidebar-item" data-view="stats" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg></span>
+          <span>Statistics</span>
+        </button>
+        <button class="sidebar-item" data-view="insights" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-bulb"></use></svg></span>
+          <span>Insights</span>
+        </button>
+        <button class="sidebar-item" data-view="dashboard" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg></span>
+          <span>Dashboard</span>
+        </button>
+        <button class="sidebar-item" data-view="goals" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg></span>
+          <span>Savings Goals</span>
+        </button>
+        <button class="sidebar-item" data-view="targets" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg></span>
+          <span>Target</span>
+        </button>
+        <button class="sidebar-item" data-view="recurring" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-repeat"></use></svg></span>
+          <span>Recurring</span>
+        </button>
+        <button class="sidebar-item" data-view="debts" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-card"></use></svg></span>
+          <span>Debts</span>
+        </button>
+        <button class="sidebar-item" data-view="subscriptions" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-tv"></use></svg></span>
+          <span>Subscriptions</span>
+        </button>
+        <button class="sidebar-item" data-view="settings" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></span>
+          <span>Settings</span>
+        </button>
+      </div>
+    </nav>
+
+    <main class="container stack">
+      <section id="configCard" class="card stack" aria-label="Configuration" hidden>
+        <div id="configWarning" class="callout callout-warning" hidden></div>
+      </section>
+
+      <section id="authCard" class="card stack" aria-label="Sign in" hidden>
+        <div class="row">
+          <h2>Sign in / Sign up</h2>
+          <div class="muted small">Use email/password or Google.</div>
+        </div>
+
+        <div id="authError" class="callout callout-warning" hidden></div>
+
+        <form id="authForm" class="stack" autocomplete="off">
+          <div class="grid-2">
+            <label class="field">
+              <span>Email</span>
+              <input id="authEmail" type="email" placeholder="you@example.com" required />
+            </label>
+            <label class="field">
+              <span>Password</span>
+              <input id="authPassword" type="password" placeholder="••••••••" required minlength="6" />
+            </label>
+          </div>
+
+          <div class="row wrap">
+            <button id="signUpBtn" class="btn" type="button">Sign up</button>
+            <button id="signInBtn" class="btn btn-secondary" type="button">Sign in</button>
+            <button id="googleBtn" class="btn btn-secondary" type="button">Continue with Google</button>
+          </div>
+        </form>
+      </section>
+
+      <div id="appContent" class="stack" hidden>
+        <div id="appError" class="callout callout-warning" hidden></div>
+
+        <div id="undoToast" class="callout callout-warning" hidden role="status" aria-live="polite">
+          <div class="row wrap">
+            <div id="undoText" class="small"></div>
+            <button id="undoBtn" class="btn btn-secondary" type="button">Undo</button>
+          </div>
+        </div>
+
+        <div id="confirmToast" class="callout callout-warning" hidden role="dialog" aria-modal="false">
+          <div class="row wrap">
+            <div id="confirmText" class="small"></div>
+            <div class="row" style="gap: 8px; justify-content: flex-end; flex: 1;">
+              <button id="confirmYesBtn" class="btn btn-danger btn-small" type="button">Delete</button>
+              <button id="confirmNoBtn" class="btn btn-secondary btn-small" type="button">Cancel</button>
+            </div>
+          </div>
+        </div>
+
+      <div class="view-container">
+
+        <!-- VIEW: Add Record -->
+        <section class="card stack view-section" data-view="record" aria-label="New record">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>Add Record</h2>
+            <div class="muted small">Choose category, expense/revenue, amount, and note.</div>
+          </div>
+
+          <div id="templateChipsWrap" class="template-chips-wrap" hidden>
+            <div class="muted small"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg>Quick templates:</div>
+            <div id="templateChips" class="template-chips"></div>
+          </div>
+
+          <form id="txForm" class="stack" autocomplete="off">
+            <label class="field">
+              <span>Category</span>
+              <select id="txCategory" required></select>
+            </label>
+
+            <div class="grid-2">
+              <label class="field">
+                <span>Type</span>
+                <select id="txType" required>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Amount</span>
+                <input id="txAmount" type="text" inputmode="numeric" placeholder="0.00" required autocomplete="off" />
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Note</span>
+              <input id="txNote" type="text" placeholder="e.g., eat" maxlength="80" list="noteSuggestions" />
+              <datalist id="noteSuggestions"></datalist>
+              <div id="autoCategorySuggestion" class="auto-cat-hint small" hidden></div>
+            </label>
+
+            <label class="field">
+              <span>Tags <span class="muted small">(comma-separated, optional)</span></span>
+              <input id="txTags" type="text" placeholder="e.g., work, urgent" maxlength="80" />
+            </label>
+
+            <label class="field">
+              <span><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Photos <span class="muted small">(receipt or item, optional)</span></span>
+              <input id="txReceiptInput" type="file" accept="image/*" multiple />
+              <div id="txReceiptPreview" class="receipt-preview-strip"></div>
+            </label>
+
+            <div id="duplicateWarning" class="callout callout-warning small" hidden role="alert">
+              <svg class="icon" aria-hidden="true"><use href="#i-warn"></use></svg>Similar record exists — same date, category & amount. Still add?
+            </div>
+
+            <label class="field">
+              <span>Date</span>
+              <div class="row" style="gap:8px">
+                <input id="txDate" type="date" required />
+                <button id="todayBtn" class="btn btn-secondary btn-small" type="button" title="Set to today">Today</button>
+              </div>
+            </label>
+
+            <div class="row wrap">
+              <button id="txSubmitBtn" class="btn" type="submit">Record</button>
+              <button id="cancelTxEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
+              <button id="saveTemplateBtn" class="btn btn-secondary" type="button" title="Save current form as a quick template"><svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg>Save as Template</button>
+              <button id="scanReceiptBtn" class="btn btn-secondary" type="button" title="Scan a receipt with camera"><svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>Scan Receipt</button>
+            </div>
+          </form>
+        </section>
+
+        <!-- VIEW: Record List -->
+        <section class="card stack view-section" data-view="records" aria-label="Record List">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>Record List</h2>
+            <div class="muted small">Browse and search your transactions.</div>
+          </div>
+
+          <div class="row">
+            <h3 class="h3"><svg class="icon" aria-hidden="true"><use href="#i-search"></use></svg>Search notes</h3>
+            <div class="muted small">Type a word like "eat" to filter notes.</div>
+          </div>
+          <div class="row">
+            <input id="searchInput" class="search" type="search" placeholder="Search note text…" />
+            <button id="clearSearchBtn" class="btn btn-secondary" type="button">Clear</button>
+          </div>
+
+          <details id="advancedFilters" class="advanced-filters">
+            <summary><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>Advanced filters</summary>
+            <div class="advanced-filters-grid">
+              <label class="field inline-sm">
+                <span>From date</span>
+                <input id="filterDateFrom" type="date" />
+              </label>
+              <label class="field inline-sm">
+                <span>To date</span>
+                <input id="filterDateTo" type="date" />
+              </label>
+              <label class="field inline-sm">
+                <span>Type</span>
+                <select id="filterType">
+                  <option value="">All</option>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+              <label class="field inline-sm">
+                <span>Category</span>
+                <select id="filterCategory">
+                  <option value="">All</option>
+                </select>
+              </label>
+              <label class="field inline-sm">
+                <span>Min amount</span>
+                <input id="filterMinAmount" type="number" min="0" step="0.01" placeholder="0" />
+              </label>
+              <label class="field inline-sm">
+                <span>Max amount</span>
+                <input id="filterMaxAmount" type="number" min="0" step="0.01" placeholder="∞" />
+              </label>
+              <label class="field inline-sm">
+                <span>Tag</span>
+                <input id="filterTag" type="text" placeholder="e.g., work" maxlength="40" />
+              </label>
+            </div>
+            <div class="row wrap" style="margin-top:8px">
+              <button id="clearFiltersBtn" class="btn btn-secondary btn-small" type="button">Reset filters</button>
+              <div id="filterSummary" class="muted small"></div>
+            </div>
+          </details>
+
+          <div class="table-wrap">
+            <table class="table" aria-label="Transactions table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Category</th>
+                  <th>Type</th>
+                  <th class="right">Amount</th>
+                  <th>Note</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="txTbody"></tbody>
+            </table>
+          </div>
+
+          <div class="pager" aria-label="Transactions pagination">
+            <div id="txPageInfo" class="muted small"></div>
+            <div class="pager-actions">
+              <button id="txPrevBtn" class="btn btn-secondary" type="button">Prev</button>
+              <button id="txNextBtn" class="btn btn-secondary" type="button">Next</button>
+            </div>
+          </div>
+
+          <div class="row wrap">
+            <button id="exportCsvBtn" class="btn btn-secondary" type="button" title="Export filtered transactions to CSV">Export CSV</button>
+          </div>
+        </section>
+
+        <!-- VIEW: Budget -->
+        <section class="card stack view-section" data-view="budget" aria-label="Categories & Budgets">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-landmark"></use></svg>Categories & Budgets</h2>
+            <div class="muted small">Add a category and set its budget.</div>
+          </div>
+
+          <form id="categoryForm" class="stack-compact" autocomplete="off">
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Name</span>
+                <input id="categoryName" type="text" placeholder="e.g., Food" required maxlength="32" />
+              </label>
+              <label class="field inline-sm">
+                <span>Budget</span>
+                <input id="categoryBudget" type="number" placeholder="0" min="0" step="0.01" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Period</span>
+                <select id="categoryPeriod" required>
+                  <option value="month" selected>Monthly</option>
+                  <option value="year">Yearly</option>
+                  <option value="lifetime">Lifetime</option>
+                </select>
+              </label>
+            </div>
+            <div class="row">
+              <button id="categorySubmitBtn" class="btn" type="submit">Add category</button>
+              <button id="cancelCategoryEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
+              <div class="muted small">Tip: Budget = 0 means no limit.</div>
+            </div>
+            <div id="categoryBudgetHint" class="muted small"></div>
+          </form>
+
+          <div class="divider-thin"></div>
+
+          <div class="compact-row">
+            <label class="field inline-sm">
+              <span>Budget month</span>
+              <input id="budgetMonth" type="month" required />
+            </label>
+            <div id="budgetScope" class="muted small"></div>
+          </div>
+
+          <div class="budget-list-wrap">
+            <div class="table-wrap">
+              <table class="table budget-table" aria-label="Category table">
+                <thead class="sr-only">
+                  <tr>
+                    <th>Name</th>
+                    <th>Period</th>
+                    <th class="right">Budget</th>
+                    <th class="right">Spent</th>
+                    <th class="right">Income</th>
+                    <th class="right">Balance</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="categoryTbody"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- VIEW: Statistics -->
+        <section class="card stack view-section stats-view" data-view="stats" aria-label="Statistics">
+
+          <div class="stats-header">
+            <h2>Statistics</h2>
+            <div class="stats-controls">
+              <select id="statsRange" class="stats-range-select">
+                <option value="week">Weekly</option>
+                <option value="month" selected>Monthly</option>
+                <option value="year">Yearly</option>
+              </select>
+              <label id="statsDateField" class="field inline-sm" hidden>
+                <input id="statsAnchorDate" type="date" required />
+              </label>
+              <label id="statsMonthField" class="field inline-sm">
+                <input id="statsMonth" type="month" required />
+              </label>
+              <label id="statsYearField" class="field inline-sm" hidden>
+                <select id="statsYear" required></select>
+              </label>
+              <button id="refreshStatsBtn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+            </div>
+            <div id="statsRangeLabel" class="muted small"></div>
+          </div>
+
+          <div class="stats-summary">
+            <div class="stat-card stat-expense">
+              <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-down"></use></svg></div>
+              <div class="stat-info">
+                <div class="stat-label">Total Expense</div>
+                <div id="totalExpense" class="stat-value">0.00</div>
+                <div id="expenseTrend" class="trend-label muted small"></div>
+              </div>
+            </div>
+            <div class="stat-card stat-revenue">
+              <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-up"></use></svg></div>
+              <div class="stat-info">
+                <div class="stat-label">Total Revenue</div>
+                <div id="totalRevenue" class="stat-value">0.00</div>
+                <div id="revenueTrend" class="trend-label muted small"></div>
+              </div>
+            </div>
+            <div class="stat-card stat-net">
+              <div class="stat-icon"><svg class="icon" aria-hidden="true"><use href="#i-gem"></use></svg></div>
+              <div class="stat-info">
+                <div class="stat-label">Net</div>
+                <div id="netTotal" class="stat-value">0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <div id="projectionRow" class="stats-projection" hidden>
+            <div class="projection-item">
+              <span class="projection-label"><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg>Daily Avg</span>
+              <span id="dailyAvgExpense" class="projection-val">—</span>
+            </div>
+            <div class="projection-item">
+              <span class="projection-label"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg>Projected</span>
+              <span id="projectedExpense" class="projection-val">—</span>
+            </div>
+            <div class="projection-item">
+              <span class="projection-label"><svg class="icon" aria-hidden="true"><use href="#i-hourglass"></use></svg>Days Left</span>
+              <span id="daysLeft" class="projection-val">—</span>
+            </div>
+          </div>
+
+          <div class="stats-chart-card" aria-label="Statistics chart">
+            <div id="statsChartMessage" class="muted small" hidden></div>
+            <canvas id="statsChart" height="140"></canvas>
+          </div>
+
+          <div class="stats-breakdown">
+            <h3 class="stats-breakdown-title">Category Breakdown</h3>
+            <div id="statsTbody" class="stats-category-grid"></div>
+          </div>
+
+        </section>
+
+        <!-- VIEW: Insights -->
+        <section class="card stack view-section" data-view="insights" aria-label="Spending Insights">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-bulb"></use></svg>Spending Insights</h2>
+            <button id="refreshInsightsBtn" class="btn btn-secondary btn-small" type="button">Refresh</button>
+          </div>
+          <div class="muted small">Auto-generated summary of your spending patterns.</div>
+          <div id="insightsContent" class="insights-content">
+            <div class="muted">Add some records to see insights.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Dashboard -->
+        <section class="card stack view-section" data-view="dashboard" aria-label="Dashboard">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg>Dashboard</h2>
+            <div class="muted small">Quick overview of your finances.</div>
+          </div>
+          <div id="dashboardContent" class="dashboard-grid">
+            <div class="dash-card">
+              <div class="dash-card-icon"><svg class="icon" aria-hidden="true"><use href="#i-down"></use></svg></div>
+              <div class="dash-card-label">This Month Expense</div>
+              <div id="dashExpense" class="dash-card-value">0.00</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon"><svg class="icon" aria-hidden="true"><use href="#i-up"></use></svg></div>
+              <div class="dash-card-label">This Month Revenue</div>
+              <div id="dashRevenue" class="dash-card-value">0.00</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon"><svg class="icon" aria-hidden="true"><use href="#i-gem"></use></svg></div>
+              <div class="dash-card-label">Net Balance</div>
+              <div id="dashNet" class="dash-card-value">0.00</div>
+            </div>
+            <div class="dash-card">
+              <div class="dash-card-icon"><svg class="icon" aria-hidden="true"><use href="#i-box"></use></svg></div>
+              <div class="dash-card-label">Total Records</div>
+              <div id="dashCount" class="dash-card-value">0</div>
+            </div>
+          </div>
+          <div class="dash-section alloc-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>Salary Allocation</h3>
+            <div class="muted small">This month's income minus your monthly category budgets.</div>
+            <div class="alloc-rows">
+              <div class="alloc-row">
+                <span class="alloc-label">Income (this month)</span>
+                <span id="allocIncome" class="alloc-value">0.00</span>
+              </div>
+              <div class="alloc-row">
+                <span class="alloc-label">− Budgeted (monthly)</span>
+                <span id="allocBudgeted" class="alloc-value">0.00</span>
+              </div>
+              <div class="alloc-row alloc-row-total">
+                <span class="alloc-label">= Remaining / Unallocated</span>
+                <span id="allocRemaining" class="alloc-value">0.00</span>
+              </div>
+            </div>
+            <div class="alloc-bar-wrap">
+              <div id="allocBar" class="alloc-bar"></div>
+            </div>
+            <div id="allocNote" class="muted small"></div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg>This Month vs Last Month</h3>
+            <div class="muted small">Spending and income compared to the previous month.</div>
+            <div id="momSummary" class="mom-summary"></div>
+            <div id="momCategories" class="mom-categories"></div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-clipboard"></use></svg>Recent Transactions</h3>
+            <div id="dashRecentTx" class="dash-recent-list">
+              <div class="muted small">No recent transactions.</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-warn"></use></svg>Budget Alerts</h3>
+            <div id="dashBudgetAlerts" class="dash-alerts">
+              <div class="muted small">All budgets are on track.</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-activity"></use></svg> Cashflow (Income vs Expense)</h3>
+            <div class="muted small">Last 6 months income compared with expense.</div>
+            <canvas id="cashflowChart" height="200"></canvas>
+            <div id="cashflowChartMessage" class="muted small" hidden></div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg>Spending Heatmap</h3>
+            <div class="muted small">Daily expense this month — darker = more spent.</div>
+            <div id="heatmapCalendar" class="heatmap-calendar"></div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-up"></use></svg> Category Trends</h3>
+            <div class="muted small">Monthly spending by category over time.</div>
+            <canvas id="trendChart" height="200"></canvas>
+            <div id="trendChartMessage" class="muted small" hidden></div>
+          </div>
+        </section>
+
+        <!-- VIEW: Savings Goals -->
+        <section class="card stack view-section" data-view="goals" aria-label="Savings Goals">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg>Savings Goals</h2>
+            <div class="muted small">Set targets and track your progress.</div>
+          </div>
+          <form id="goalForm" class="stack-compact" autocomplete="off">
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Goal Name</span>
+                <input id="goalName" type="text" placeholder="e.g., Emergency Fund" required maxlength="40" />
+              </label>
+              <label class="field inline-sm">
+                <span>Target Amount</span>
+                <input id="goalTarget" type="number" min="1" step="0.01" placeholder="5000" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Deadline</span>
+                <input id="goalDeadline" type="date" />
+              </label>
+            </div>
+            <div class="row">
+              <button id="goalSubmitBtn" class="btn" type="submit">Add Goal</button>
+            </div>
+          </form>
+          <div class="divider-thin"></div>
+          <div id="goalsContainer" class="goals-list">
+            <div class="muted small">No savings goals yet.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Life Targets -->
+        <section class="card stack view-section" data-view="targets" aria-label="Life Targets">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg>Target</h2>
+            <div class="muted small">Things you want to achieve by a certain age — a checklist timeline.</div>
+          </div>
+          <form id="targetForm" class="stack-compact" autocomplete="off">
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>What do you want to achieve?</span>
+                <input id="targetText" type="text" placeholder="e.g., Travel around the world" required maxlength="80" />
+              </label>
+              <label class="field inline-sm">
+                <span>Achieve by age</span>
+                <input id="targetAge" type="number" min="1" max="120" step="1" placeholder="30" required />
+              </label>
+            </div>
+            <div class="row">
+              <button id="targetSubmitBtn" class="btn" type="submit">Add Target</button>
+            </div>
+          </form>
+          <div class="divider-thin"></div>
+          <div class="row wrap targets-controls">
+            <label class="field inline-sm targets-age-field">
+              <span>Your current age (optional)</span>
+              <input id="targetCurrentAge" type="number" min="0" max="120" step="1" placeholder="e.g., 25" />
+            </label>
+            <div id="targetSummary" class="targets-summary muted small"></div>
+          </div>
+          <div id="targetsContainer" class="targets-timeline">
+            <div class="muted small">No targets yet.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Recurring Transactions -->
+        <section class="card stack view-section" data-view="recurring" aria-label="Recurring Transactions">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-repeat"></use></svg>Recurring Transactions</h2>
+            <div class="muted small">Auto-add monthly expenses or income.</div>
+          </div>
+          <form id="recurringForm" class="stack-compact" autocomplete="off">
+            <div class="grid-2">
+              <label class="field inline-sm">
+                <span>Category</span>
+                <select id="recurringCategory" required></select>
+              </label>
+              <label class="field inline-sm">
+                <span>Type</span>
+                <select id="recurringType" required>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Amount</span>
+                <input id="recurringAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Note</span>
+                <input id="recurringNote" type="text" placeholder="e.g., Netflix" maxlength="80" />
+              </label>
+              <label class="field inline-sm">
+                <span>Day of Month</span>
+                <input id="recurringDay" type="number" min="1" max="31" placeholder="1" required />
+              </label>
+            </div>
+            <div class="row">
+              <button id="recurringSubmitBtn" class="btn" type="submit">Add Rule</button>
+            </div>
+          </form>
+          <div class="divider-thin"></div>
+          <div id="recurringContainer" class="recurring-list">
+            <div class="muted small">No recurring rules yet.</div>
+          </div>
+          <div class="row wrap" style="margin-top:12px;">
+            <button id="runRecurringBtn" class="btn btn-secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-play"></use></svg>Run Due Recurring Now</button>
+            <div class="muted small">Manually trigger any recurring transactions due today.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Settings -->
+        <!-- VIEW: Debts -->
+        <section class="card stack view-section" data-view="debts" aria-label="Debts & Lending">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-card"></use></svg>Debts & Lending</h2>
+            <div class="muted small">Track who owes you and what you owe.</div>
+          </div>
+          <form id="debtForm" class="stack-compact" autocomplete="off">
+            <div class="grid-2">
+              <label class="field inline-sm">
+                <span>Person</span>
+                <input id="debtPerson" type="text" placeholder="e.g., Ali" required maxlength="40" />
+              </label>
+              <label class="field inline-sm">
+                <span>Direction</span>
+                <select id="debtDirection" required>
+                  <option value="owed_to_me">They owe me</option>
+                  <option value="i_owe">I owe them</option>
+                </select>
+              </label>
+            </div>
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Amount</span>
+                <input id="debtAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Note</span>
+                <input id="debtNote" type="text" placeholder="optional" maxlength="60" />
+              </label>
+              <label class="field inline-sm">
+                <span>Due Date</span>
+                <input id="debtDueDate" type="date" />
+              </label>
+            </div>
+            <div class="row">
+              <button id="debtSubmitBtn" class="btn" type="submit">Add Debt</button>
+            </div>
+          </form>
+
+          <div class="divider-thin"></div>
+
+          <div id="debtSummary" class="debt-summary"></div>
+
+          <div class="row wrap" style="gap:8px">
+            <h3 style="margin:0"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"></use></svg>Outstanding</h3>
+            <label class="muted small" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input id="debtShowSettled" type="checkbox" /> Show settled
+            </label>
+          </div>
+          <div id="debtsContainer" class="debts-list">
+            <div class="muted small">No debts recorded yet.</div>
+          </div>
+        </section>
+
+        <!-- VIEW: Subscriptions -->
+        <section class="card stack view-section" data-view="subscriptions" aria-label="Subscriptions">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-tv"></use></svg>Subscriptions</h2>
+            <div class="muted small">Track recurring services and pay them on renewal.</div>
+          </div>
+          <form id="subForm" class="stack-compact" autocomplete="off">
+            <div class="grid-2">
+              <label class="field inline-sm">
+                <span>Name</span>
+                <input id="subName" type="text" placeholder="e.g., Netflix" required maxlength="40" />
+              </label>
+              <label class="field inline-sm">
+                <span>Category</span>
+                <select id="subCategory" required></select>
+              </label>
+            </div>
+            <div class="grid-3-budget">
+              <label class="field inline-sm">
+                <span>Amount</span>
+                <input id="subAmount" type="number" min="0.01" step="0.01" placeholder="0.00" required />
+              </label>
+              <label class="field inline-sm">
+                <span>Billing Cycle</span>
+                <select id="subCycle" required>
+                  <option value="month">Monthly</option>
+                  <option value="year">Yearly</option>
+                </select>
+              </label>
+              <label class="field inline-sm">
+                <span>Next Renewal</span>
+                <input id="subRenewal" type="date" required />
+              </label>
+            </div>
+            <div class="row">
+              <button id="subSubmitBtn" class="btn" type="submit">Add Subscription</button>
+            </div>
+          </form>
+
+          <div class="divider-thin"></div>
+
+          <div id="subSummary" class="debt-summary"></div>
+
+          <div class="row wrap" style="gap:8px">
+            <h3 style="margin:0"><svg class="icon" aria-hidden="true"><use href="#i-clipboard"></use></svg>Active</h3>
+            <label class="muted small" style="display:flex;align-items:center;gap:6px;cursor:pointer">
+              <input id="subShowCancelled" type="checkbox" /> Show cancelled
+            </label>
+          </div>
+          <div id="subsContainer" class="debts-list">
+            <div class="muted small">No subscriptions yet.</div>
+          </div>
+        </section>
+
+        <section class="card stack view-section" data-view="settings" aria-label="Settings">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>Settings</h2>
+            <div class="muted small">Configure your preferences.</div>
+          </div>
+
+          <div class="stack-compact">
+            <label class="field">
+              <span>Currency Symbol</span>
+              <div class="muted small">Prefix for all amounts (e.g., RM, $, €, £, ¥). Leave empty for no prefix.</div>
+              <input id="currencySymbolInput" type="text" placeholder="RM" maxlength="5" style="max-width:120px" />
+            </label>
+            <button id="saveCurrencyBtn" class="btn btn-secondary btn-small" type="button">Save Currency</button>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-bell"></use></svg> Budget Alerts</h3>
+            <div class="muted small">Get a browser notification when a category reaches 80% or exceeds its monthly budget.</div>
+            <div class="row wrap" style="gap:8px">
+              <button id="toggleBudgetAlertsBtn" class="btn btn-secondary btn-small" type="button">Enable Budget Alerts</button>
+              <span id="budgetAlertsStatus" class="muted small"></span>
+            </div>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg>Quick Templates</h3>
+            <div class="muted small">Saved templates appear as one-tap chips on the Add Record screen. Create them with "<svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg>Save as Template" on that screen.</div>
+            <div id="templateManageList" class="template-manage-list">
+              <div class="muted small">No templates yet.</div>
+            </div>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-box"></use></svg>Data Backup</h3>
+            <div class="muted small">Export all your data as JSON, or import a backup file.</div>
+            <div class="row wrap" style="gap:8px">
+              <button id="exportJsonBtn" class="btn btn-secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-download"></use></svg>Export JSON</button>
+              <label class="btn btn-secondary" style="cursor:pointer;">
+                <svg class="icon" aria-hidden="true"><use href="#i-upload"></use></svg>Import JSON
+                <input id="importJsonInput" type="file" accept=".json,application/json" hidden />
+              </label>
+            </div>
+            <div id="importStatus" class="muted small"></div>
+          </div>
+
+          <div class="divider-thin"></div>
+
+          <div class="stack-compact">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-file-text"></use></svg>PDF Report</h3>
+            <div class="muted small">Generate a monthly PDF report of your transactions.</div>
+            <div class="grid-2" style="max-width:360px">
+              <label class="field inline-sm">
+                <span>Report Month</span>
+                <input id="pdfReportMonth" type="month" required />
+              </label>
+              <div style="display:flex;align-items:flex-end;">
+                <button id="exportPdfBtn" class="btn btn-secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-file-text"></use></svg>Generate PDF</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div> <!-- .view-container -->
+      </div>
+
+      <!-- Budget Records Modal -->
+      <div id="budgetRecordsModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal budget-records-modal" role="dialog" aria-modal="true" aria-labelledby="budgetRecordsTitle" aria-describedby="budgetRecordsMeta">
+          <div class="edit-modal-header">
+            <div class="stack-compact budget-records-header">
+              <h3 id="budgetRecordsTitle">Budget Records</h3>
+              <div id="budgetRecordsMeta" class="muted small"></div>
+            </div>
+            <button id="closeBudgetRecordsModal" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+          </div>
+          <div id="budgetRecordsSummary" class="budget-records-summary"></div>
+          <div class="budget-records-filters">
+            <input id="budgetRecordsSearch" class="search" type="search" placeholder="Search by note or date…" />
+            <div class="budget-records-date-filter">
+              <input id="budgetRecordsDateFilter" type="date" title="Filter by date" />
+              <button id="budgetRecordsClearDate" class="btn btn-secondary btn-small" type="button">Clear</button>
+            </div>
+          </div>
+          <div class="table-wrap budget-records-table-wrap">
+            <table class="table" aria-label="Budget records table">
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Type</th>
+                  <th class="right">Amount</th>
+                  <th>Note</th>
+                </tr>
+              </thead>
+              <tbody id="budgetRecordsTbody"></tbody>
+            </table>
+          </div>
+          <div class="pager" aria-label="Budget records pagination">
+            <div id="budgetRecordsPageInfo" class="muted small"></div>
+            <div class="pager-actions">
+              <button id="budgetRecordsPrevBtn" class="btn btn-secondary" type="button">Prev</button>
+              <button id="budgetRecordsNextBtn" class="btn btn-secondary" type="button">Next</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Edit Transaction Modal -->
+      <div id="editTxModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal" role="dialog" aria-modal="true" aria-label="Edit Record">
+          <div class="edit-modal-header">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg>Edit Record</h3>
+            <button id="closeEditModal" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+          </div>
+          <form id="editTxForm" class="stack" autocomplete="off">
+            <label class="field">
+              <span>Category</span>
+              <select id="editTxCategory" required></select>
+            </label>
+            <div class="grid-2">
+              <label class="field">
+                <span>Type</span>
+                <select id="editTxType" required>
+                  <option value="expense">Expense</option>
+                  <option value="revenue">Revenue</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Amount</span>
+                <input id="editTxAmount" type="text" inputmode="numeric" placeholder="0.00" required autocomplete="off" />
+              </label>
+            </div>
+            <label class="field">
+              <span>Note</span>
+              <input id="editTxNote" type="text" placeholder="e.g., eat" maxlength="80" />
+            </label>
+            <label class="field">
+              <span>Tags <span class="muted small">(comma-separated)</span></span>
+              <input id="editTxTags" type="text" placeholder="e.g., work, urgent" maxlength="80" />
+            </label>
+            <label class="field">
+              <span>Date</span>
+              <input id="editTxDate" type="date" required />
+            </label>
+            <div class="row wrap">
+              <button id="editTxSaveBtn" class="btn" type="submit">Save</button>
+              <button id="editTxCancelBtn" class="btn btn-secondary" type="button">Cancel</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Receipt Scan Modal -->
+      <div id="receiptModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal" role="dialog" aria-modal="true" aria-label="Scan Receipt">
+          <div class="edit-modal-header">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>Scan Receipt</h3>
+            <button id="closeReceiptModal" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+          </div>
+          <div class="receipt-scan-body">
+            <p class="muted small">Take a photo or upload a receipt image. We'll extract the amount and text automatically.</p>
+            <div class="receipt-capture-area">
+              <video id="receiptVideo" class="receipt-video" autoplay playsinline hidden></video>
+              <canvas id="receiptCanvas" hidden></canvas>
+              <img id="receiptPreview" class="receipt-preview" hidden alt="Receipt preview" />
+            </div>
+            <div class="row wrap" style="gap:8px; margin-top:12px;">
+              <button id="receiptCameraBtn" class="btn btn-secondary" type="button"><svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>Use Camera</button>
+              <label class="btn btn-secondary" style="cursor:pointer;">
+                <svg class="icon" aria-hidden="true"><use href="#i-folder"></use></svg>Upload Image
+                <input id="receiptFileInput" type="file" accept="image/*" hidden />
+              </label>
+              <button id="receiptCaptureBtn" class="btn" type="button" hidden><svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>Capture</button>
+            </div>
+            <div id="receiptStatus" class="muted small" style="margin-top:8px;"></div>
+            <div id="receiptResult" class="receipt-result" hidden>
+              <div class="receipt-result-header">Extracted Data:</div>
+              <div class="receipt-result-row"><strong>Amount:</strong> <span id="receiptAmountResult">—</span></div>
+              <div class="receipt-result-row"><strong>Text:</strong> <span id="receiptTextResult">—</span></div>
+              <div class="row wrap" style="gap:8px; margin-top:12px;">
+                <button id="receiptApplyBtn" class="btn" type="button">Apply to Form</button>
+                <button id="receiptRetryBtn" class="btn btn-secondary" type="button">Try Again</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Receipt Viewer Modal -->
+      <div id="receiptViewerModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal" role="dialog" aria-modal="true" aria-label="Receipt photos">
+          <div class="edit-modal-header">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-paperclip"></use></svg>Photos</h3>
+            <button id="closeReceiptViewer" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+          </div>
+          <div class="receipt-viewer-body">
+            <div class="row wrap" style="gap:8px; margin-bottom:10px;">
+              <label class="btn btn-secondary btn-small" style="cursor:pointer;">
+                <svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>Add Photos
+                <input id="receiptViewerAddInput" type="file" accept="image/*" multiple hidden />
+              </label>
+              <span id="receiptViewerStatus" class="muted small"></span>
+            </div>
+            <div id="receiptViewerGrid" class="receipt-viewer-grid"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Receipt Lightbox -->
+      <div id="receiptLightbox" class="receipt-lightbox" hidden>
+        <img id="receiptLightboxImg" alt="Receipt full view" />
+      </div>
+
+      <!-- Day Detail Modal -->
+      <div id="dayDetailModal" class="edit-modal-overlay" hidden>
+        <div class="edit-modal" role="dialog" aria-modal="true" aria-labelledby="dayDetailTitle">
+          <div class="edit-modal-header">
+            <h3 id="dayDetailTitle"><svg class="icon" aria-hidden="true"><use href="#i-calendar"></use></svg>Day</h3>
+            <button id="closeDayDetail" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+          </div>
+          <div id="dayDetailSummary" class="day-detail-summary"></div>
+          <div id="dayDetailList" class="day-detail-list"></div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Voice / Text Assistant -->
+    <button id="assistantFab" class="assistant-fab" type="button" title="Voice assistant" hidden>
+      <span class="fab-icon"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></span>
+    </button>
+
+    <!-- Quick Add (jump to Add Record from any view) -->
+    <button id="quickAddFab" class="quick-add-fab" type="button" title="Quick add record (N)" hidden aria-label="Quick add record">
+      <span class="fab-icon"><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg></span>
+    </button>
+
+    <div id="assistantPanel" class="assistant-panel" hidden>
+      <div class="assistant-header">
+        <div class="assistant-title"><svg class="icon" aria-hidden="true"><use href="#i-chat"></use></svg>Smart Assistant</div>
+        <div class="muted small">Voice or type in Chinese / English / mixed</div>
+        <button id="closeAssistant" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
+      </div>
+      <div id="assistantChat" class="assistant-chat"></div>
+      <div class="assistant-input-row">
+        <input id="assistantInput" type="text" placeholder="e.g. 今天吃鸡饭18块 / spent 50 on fuel" autocomplete="off" />
+        <button id="assistantMicBtn" class="btn assistant-mic" type="button" title="Hold to speak"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></button>
+        <button id="assistantSendBtn" class="btn" type="button" title="Send"><svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg></button>
+      </div>
+    </div>
+
+    <script type="module" src="./app.js?v=9"></script>
+    <script>
+      // Desktop sidebar close – inline fallback
+      document.addEventListener("DOMContentLoaded", () => {
+        const closeBtn = document.getElementById("closeSidebar");
+        if (closeBtn) {
+          closeBtn.addEventListener("click", () => {
+            document.body.classList.add("sidebar-collapsed");
+          });
+        }
+      });
+    </script>
+    <script>
+      if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      }
+    </script>
+  </body>
+</html>
