@@ -13,6 +13,9 @@ export function createTargets(ctx) {
   // In-progress edit values, preserved so a background re-render (e.g. a
   // Firestore snapshot) doesn't wipe what the user has typed.
   let editDraft = null;
+  // Id of the target the draft above belongs to. Without this a draft captured
+  // from one row could be replayed into a different row's edit form.
+  let editDraftId = null;
 
   function getCurrentAge() {
     const raw = localStorage.getItem(CURRENT_AGE_KEY);
@@ -40,11 +43,20 @@ export function createTargets(ctx) {
     if (!container) return;
 
     // Preserve any in-progress edit before we rebuild the list, so a snapshot
-    // arriving mid-edit doesn't discard what the user has typed.
-    if (editingId != null) {
+    // arriving mid-edit doesn't discard what the user has typed. The draft is
+    // tagged with the id of the row currently in the DOM, which is not always
+    // editingId: when the user jumps straight to another row's Edit button,
+    // editingId already points at the new row while the DOM still shows the
+    // old one. Tagging keeps the old row's text from leaking into the new form.
+    const liveRow = container.querySelector("[data-action='save-target']");
+    const liveId = liveRow ? liveRow.dataset.id : null;
+    if (liveId != null) {
       const liveText = container.querySelector("[data-edit-text]");
       const liveAge = container.querySelector("[data-edit-age]");
-      if (liveText && liveAge) editDraft = { text: liveText.value, age: liveAge.value };
+      if (liveText && liveAge) {
+        editDraft = { text: liveText.value, age: liveAge.value };
+        editDraftId = liveId;
+      }
     }
 
     const summaryEl = document.getElementById("targetSummary");
@@ -52,7 +64,7 @@ export function createTargets(ctx) {
 
     if (list.length === 0) {
       editingId = null;
-      editDraft = null;
+      clearDraft();
       container.innerHTML =
         '<div class="muted small">No targets yet. Add something you want to achieve above!</div>';
       if (summaryEl) summaryEl.textContent = "";
@@ -63,7 +75,7 @@ export function createTargets(ctx) {
     // edit state so we don't render a phantom edit row.
     if (editingId != null && !list.some((t) => t.id === editingId)) {
       editingId = null;
-      editDraft = null;
+      clearDraft();
     }
 
     // Sort into a timeline: earliest target age first.
@@ -119,7 +131,10 @@ export function createTargets(ctx) {
   }
 
   function renderEditRow(t) {
-    const draft = editDraft || { text: t.text || "", age: t.age || "" };
+    // Only reuse a draft that belongs to this target; anything else would show
+    // another row's unsaved text.
+    const draft =
+      editDraft && editDraftId === t.id ? editDraft : { text: t.text || "", age: t.age || "" };
     return `<div class="target-item editing">
       <div class="target-node">${t.age || 0}</div>
       <div class="target-body target-edit-body">
@@ -157,20 +172,33 @@ export function createTargets(ctx) {
     textInput.focus();
   }
 
-  // Enter edit mode for a target and focus its description field.
-  function editTarget(targetId) {
-    if (!ctx.targets.some((t) => t.id === targetId)) return;
-    editingId = targetId;
+  function clearDraft() {
     editDraft = null;
-    renderTargets();
+    editDraftId = null;
+  }
+
+  function focusEditInput() {
     const input = document.querySelector("#targetsContainer [data-edit-text]");
     if (input) { input.focus(); input.select(); }
   }
 
+  // Enter edit mode for a target and focus its description field. Moving to
+  // another target discards the unsaved draft of the one being left, exactly as
+  // Cancel would.
+  function editTarget(targetId) {
+    if (!ctx.targets.some((t) => t.id === targetId)) return;
+    if (editingId === targetId) { focusEditInput(); return; }
+    editingId = targetId;
+    clearDraft();
+    renderTargets();
+    focusEditInput();
+  }
+
+  // Always re-render: the edit row can still be on screen after editingId was
+  // cleared, and a Cancel that did nothing would leave it stuck there.
   function cancelEditTarget() {
-    if (editingId == null) return;
     editingId = null;
-    editDraft = null;
+    clearDraft();
     renderTargets();
   }
 
@@ -188,7 +216,16 @@ export function createTargets(ctx) {
     if (!text || !Number.isFinite(age) || age < 1) return;
 
     editingId = null;
-    editDraft = null;
+    clearDraft();
+
+    // Apply the change locally and redraw straight away rather than waiting for
+    // the Firestore snapshot: saving without having changed anything is a no-op
+    // write that raises no snapshot at all, which used to leave the row stuck in
+    // edit mode with Save and Cancel looking dead.
+    const local = ctx.targets.find((t) => t.id === targetId);
+    if (local) { local.text = text; local.age = age; }
+    renderTargets();
+
     const { targets: targetsCol } = userCollections(ctx.uid);
     await setDoc(doc(targetsCol, targetId), { text, age }, { merge: true });
   }
@@ -201,7 +238,7 @@ export function createTargets(ctx) {
   }
 
   async function deleteTarget(targetId) {
-    if (editingId === targetId) { editingId = null; editDraft = null; }
+    if (editingId === targetId) { editingId = null; clearDraft(); }
     const { targets: targetsCol } = userCollections(ctx.uid);
     await deleteDoc(doc(targetsCol, targetId));
   }
