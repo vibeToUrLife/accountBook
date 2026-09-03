@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=10" />
+    <link rel="stylesheet" href="./styles.css?v=11" />
   </head>
   <body>
     <!-- SVG icon sprite (Lucide-style). Referenced via <svg class="icon"><use href="#i-NAME"></use></svg> -->
@@ -590,7 +590,8 @@
           </div>
           <div class="dash-section">
             <h3><svg class="icon" aria-hidden="true"><use href="#i-up"></use></svg> Category Trends</h3>
-            <div class="muted small">Monthly spending by category over time.</div>
+            <div class="muted small">Monthly spending by category over time. Tap a category to show or hide it.</div>
+            <div id="trendCategoryPicker" class="trend-cat-picker" hidden></div>
             <canvas id="trendChart" height="200"></canvas>
             <div id="trendChartMessage" class="muted small" hidden></div>
           </div>
@@ -1074,7 +1075,7 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js?v=9"></script>
+    <script type="module" src="./app.js?v=10"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

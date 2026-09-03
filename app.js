@@ -338,6 +338,20 @@ function money(n) {
   return `${currencySymbol}${v.toFixed(2)}`;
 }
 
+/* Stable colour derived from a category id, so any number of user categories
+   gets a distinct, repeatable colour that stays the same across the stats
+   chips, the breakdown donut and the trend chart. */
+function categoryColor(id) {
+  let hash = 0;
+  const key = String(id || "");
+  for (let i = 0; i < key.length; i++) hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  // Golden-angle steps keep neighbouring hashes far apart on the colour wheel.
+  const hue = Math.round(hash * 137.508) % 360;
+  const sat = 62 + (hash % 3) * 8;
+  const light = 50 + ((hash >> 2) % 3) * 6;
+  return `hsl(${hue} ${sat}% ${light}%)`;
+}
+
 function budgetMonthRefDate() {
   const monthValue = els.budgetMonth.value || currentMonthValue();
   const [y, m] = monthValue.split("-").map((x) => Number(x));
@@ -538,17 +552,15 @@ async function renderStatsChart(range, start, endExclusive) {
     return;
   }
 
-  // Build a palette from existing theme tokens (no new hard-coded theme colors).
-  const primary = cssVar("--primary", "#6ea8fe");
-  const danger = cssVar("--danger", "#ff6b6b");
-  const warning = cssVar("--warning", "#ffd166");
-
   const withAlpha = (color, alpha) => {
     const a = Math.max(0, Math.min(1, alpha));
     if (!color) return `rgba(0,0,0,${a})`;
     const c = String(color).trim();
     if (c.startsWith("rgba(")) {
       return c.replace(/rgba\(([^,]+),([^,]+),([^,]+),[^\)]+\)/, `rgba($1,$2,$3,${a})`);
+    }
+    if (c.startsWith("hsl(")) {
+      return c.replace(/^hsl\(([^)]+)\)$/, `hsl($1 / ${a})`);
     }
     if (c.startsWith("rgb(")) {
       return c.replace(/rgb\(([^,]+),([^,]+),([^\)]+)\)/, `rgba($1,$2,$3,${a})`);
@@ -563,15 +575,12 @@ async function renderStatsChart(range, start, endExclusive) {
     return c;
   };
 
-  const baseColors = [primary, danger, warning];
-  const alphaSteps = [0.85, 0.65, 0.5, 0.35];
-
-  validCatIds.forEach((id, index) => {
+  // One stable colour per category (not per rank), so a slice keeps its colour
+  // as amounts change and every user category stays distinguishable.
+  validCatIds.forEach((id) => {
     labels.push(getCatName(id));
     dataPoints.push(Math.round(categoryTotals[id] * 100) / 100);
-    const base = baseColors[index % baseColors.length];
-    const alpha = alphaSteps[Math.floor(index / baseColors.length) % alphaSteps.length];
-    backgroundColors.push(withAlpha(base, alpha));
+    backgroundColors.push(withAlpha(categoryColor(id), 0.85));
   });
 
   const text = cssVar("--text", "rgba(255,255,255,0.92)");
@@ -1282,6 +1291,7 @@ function renderStats() {
     if (!(d >= start && d < endExclusive)) continue;
 
     const entry = byCategory.get(tx.categoryId) || {
+      categoryId: tx.categoryId || "uncategorized",
       categoryName: tx.categoryName || "(Unknown)",
       expense: 0,
       revenue: 0,
@@ -1322,11 +1332,8 @@ function renderStats() {
     return;
   }
 
-  // Color palette for dots
-  const dotColors = ["#7c5cfc", "#ef4444", "#f59e0b", "#22c55e", "#06b6d4", "#ec4899", "#8b5cf6", "#14b8a6"];
-
-  rows.forEach((r, i) => {
-    const dotColor = dotColors[i % dotColors.length];
+  rows.forEach((r) => {
+    const dotColor = categoryColor(r.categoryId);
     const netVal = r.revenue - r.expense;
     const chip = document.createElement("div");
     chip.className = "stats-cat-chip";
@@ -2202,8 +2209,31 @@ const CATEGORY_MAP = [
   { keys: ["salary","工资","薪水","income","收入","bonus","奖金","freelance","兼职","dividend","利息","interest"], cat: "salary" },
 ];
 
+/* The user's own category names win over the built-in keyword map, so a
+   category like "Pets" or "旅游" is recognised even though no keyword covers
+   it. Returns the matched category name (findCategoryByNlp resolves it). */
+function detectUserCategoryName(lower) {
+  let best = null;
+  let bestLen = 0;
+  for (const c of categories) {
+    const name = String(c.name || "").trim().toLowerCase();
+    // 1-character names are too easy to hit by accident inside a sentence.
+    if (name.length < 2) continue;
+    if (lower.includes(name) && name.length > bestLen) {
+      best = c.name;
+      bestLen = name.length;
+    }
+  }
+  return best;
+}
+
 function detectCategory(text) {
   const lower = text.toLowerCase();
+
+  const own = detectUserCategoryName(lower);
+  if (own) return own;
+
+  // Fallback: keyword map, resolved against the user's categories later.
   let best = null;
   let bestScore = 0;
   for (const group of CATEGORY_MAP) {
@@ -2377,7 +2407,6 @@ function parseNaturalInput(text) {
   if (itemName) result.item_name = itemName;
   if (date) result.date = date;
   if (month) result.month = month;
-  result.currency = "MYR";
 
   return result;
 }
@@ -3383,6 +3412,14 @@ function renderDashboard() {
 
   renderHeatmapCalendar();
   renderMonthComparison();
+
+  // Keep the trend chart in sync when categories or transactions change while
+  // the dashboard is on screen.
+  const dashSection = document.querySelector('.view-section[data-view="dashboard"]');
+  if (dashSection && dashSection.classList.contains("active")) {
+    renderTrendChart();
+    renderCashflowChart();
+  }
 }
 
 function renderMonthComparison() {
@@ -3472,52 +3509,149 @@ function renderMonthComparison() {
 }
 
 /* ─── Category Trends Chart ─── */
+/* Series are built from the signed-in user's own categories — nothing is
+   hardcoded. Every category the user owns can be toggled on the chart, and the
+   selection is remembered locally. */
+const TREND_SELECTION_KEY = "accountBook.trendCategories";
+const TREND_UNCATEGORIZED = "__uncategorized__";
+const TREND_MAX_DEFAULT = 5;
+let trendSelectedCatIds = null;
+
+function loadTrendSelection() {
+  if (trendSelectedCatIds) return trendSelectedCatIds;
+  try {
+    const raw = localStorage.getItem(TREND_SELECTION_KEY);
+    const parsed = raw ? JSON.parse(raw) : null;
+    trendSelectedCatIds = Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : null;
+  } catch {
+    trendSelectedCatIds = null;
+  }
+  return trendSelectedCatIds;
+}
+
+function saveTrendSelection(ids) {
+  trendSelectedCatIds = ids;
+  try {
+    localStorage.setItem(TREND_SELECTION_KEY, JSON.stringify(ids));
+  } catch {
+    /* storage unavailable — selection stays in memory only */
+  }
+}
+
+function trendMonths() {
+  const now = new Date();
+  const months = [];
+  for (let i = 5; i >= 0; i--) {
+    months.push(currentMonthValue(new Date(now.getFullYear(), now.getMonth() - i, 1)));
+  }
+  return months;
+}
+
+/* The user's categories, ordered by spending in the window. Expenses whose
+   category was deleted are grouped under "Uncategorized" instead of dropped. */
+function trendCategoryOptions(months) {
+  const known = new Set(categories.map((c) => c.id));
+  const totals = new Map();
+  for (const tx of transactions) {
+    if (tx.type !== "expense") continue;
+    const m = tx.dateISO ? tx.dateISO.substring(0, 7) : "";
+    if (!months.includes(m)) continue;
+    const key = known.has(tx.categoryId) ? tx.categoryId : TREND_UNCATEGORIZED;
+    totals.set(key, (totals.get(key) || 0) + tx.amount);
+  }
+
+  const options = categories.map((c) => ({ id: c.id, name: c.name, total: totals.get(c.id) || 0 }));
+  if (totals.has(TREND_UNCATEGORIZED)) {
+    options.push({ id: TREND_UNCATEGORIZED, name: "Uncategorized", total: totals.get(TREND_UNCATEGORIZED) });
+  }
+  options.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  return options;
+}
+
+function resolveTrendSelection(options) {
+  const available = new Set(options.map((o) => o.id));
+  const saved = loadTrendSelection();
+  if (saved) {
+    // An explicitly emptied selection is respected; a stale one (categories
+    // renamed away or deleted) falls back to the defaults below.
+    if (!saved.length) return [];
+    const kept = saved.filter((id) => available.has(id));
+    if (kept.length) return kept;
+  }
+  const spent = options.filter((o) => o.total > 0);
+  return (spent.length ? spent : options).slice(0, TREND_MAX_DEFAULT).map((o) => o.id);
+}
+
+function renderTrendCategoryPicker(options, selected) {
+  const wrap = document.getElementById("trendCategoryPicker");
+  if (!wrap) return;
+  if (!options.length) {
+    wrap.innerHTML = "";
+    wrap.hidden = true;
+    return;
+  }
+  wrap.hidden = false;
+  const chosen = new Set(selected);
+  wrap.innerHTML = options.map((o) => {
+    const on = chosen.has(o.id);
+    return `<button type="button" class="trend-chip${on ? " active" : ""}" data-cat-id="${escapeHtml(o.id)}" aria-pressed="${on}">
+      <span class="cat-dot" style="background:${on ? categoryColor(o.id) : "var(--border)"}"></span>
+      <span class="trend-chip-name">${escapeHtml(o.name)}</span>
+      <span class="trend-chip-amount">${money(o.total)}</span>
+    </button>`;
+  }).join("");
+}
+
 async function renderTrendChart() {
   const canvas = document.getElementById("trendChart");
   const msgEl = document.getElementById("trendChartMessage");
   if (!canvas) return;
 
-  if (transactions.length === 0) {
-    if (msgEl) { msgEl.textContent = "No data yet."; msgEl.hidden = false; }
+  const showMessage = (text) => {
+    if (msgEl) { msgEl.textContent = text; msgEl.hidden = false; }
     canvas.style.visibility = "hidden";
+    if (window._trendChart) { window._trendChart.destroy(); window._trendChart = null; }
+  };
+
+  const months = trendMonths();
+  const options = trendCategoryOptions(months);
+
+  if (!options.length) {
+    renderTrendCategoryPicker(options, []);
+    showMessage("Add a category to see trends.");
+    return;
+  }
+  if (!options.some((o) => o.total > 0)) {
+    renderTrendCategoryPicker(options, []);
+    showMessage("No expenses in the last 6 months.");
+    return;
+  }
+
+  const selected = resolveTrendSelection(options);
+  renderTrendCategoryPicker(options, selected);
+
+  if (!selected.length) {
+    showMessage("Select at least one category to see its trend.");
     return;
   }
 
   try {
     const Chart = await ensureChartJs();
+    const known = new Set(categories.map((c) => c.id));
+    const nameById = new Map(options.map((o) => [o.id, o.name]));
 
-    // Get last 6 months
-    const now = new Date();
-    const months = [];
-    for (let i = 5; i >= 0; i--) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      months.push(currentMonthValue(d));
-    }
-
-    // Top 5 expense categories by total spending
-    const catTotals = new Map();
-    for (const tx of transactions) {
-      if (tx.type !== "expense") continue;
-      const m = tx.dateISO ? tx.dateISO.substring(0, 7) : "";
-      if (!months.includes(m)) continue;
-      catTotals.set(tx.categoryId, (catTotals.get(tx.categoryId) || 0) + tx.amount);
-    }
-    const topCats = [...catTotals.entries()]
-      .filter(([id]) => categories.some((c) => c.id === id))
-      .sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id);
-
-    const colors = ["#7c5cfc", "#e54360", "#22c55e", "#e89420", "#3b82f6"];
-    const datasets = topCats.map((catId, i) => {
-      const cat = categories.find((c) => c.id === catId);
-      const data = months.map((m) => {
-        return transactions.filter((t) => t.categoryId === catId && t.type === "expense" && t.dateISO && t.dateISO.substring(0, 7) === m)
-          .reduce((s, t) => s + t.amount, 0);
-      });
+    const datasets = selected.map((catId) => {
+      const data = months.map((m) => transactions.reduce((sum, t) => {
+        if (t.type !== "expense" || !t.dateISO || t.dateISO.substring(0, 7) !== m) return sum;
+        const key = known.has(t.categoryId) ? t.categoryId : TREND_UNCATEGORIZED;
+        return key === catId ? sum + t.amount : sum;
+      }, 0));
+      const color = categoryColor(catId);
       return {
-        label: cat ? cat.name : "(Unknown)",
+        label: nameById.get(catId) || "(Unknown)",
         data,
-        borderColor: colors[i % colors.length],
-        backgroundColor: colors[i % colors.length] + "22",
+        borderColor: color,
+        backgroundColor: color,
         fill: false,
         tension: 0.3,
       };
@@ -3540,8 +3674,17 @@ async function renderTrendChart() {
     if (msgEl) msgEl.hidden = true;
     canvas.style.visibility = "visible";
   } catch (err) {
-    if (msgEl) { msgEl.textContent = "Chart unavailable."; msgEl.hidden = false; }
+    showMessage("Chart unavailable.");
   }
+}
+
+function toggleTrendCategory(catId) {
+  const months = trendMonths();
+  const options = trendCategoryOptions(months);
+  const current = resolveTrendSelection(options);
+  const next = current.includes(catId) ? current.filter((id) => id !== catId) : [...current, catId];
+  saveTrendSelection(next);
+  renderTrendChart();
 }
 
 /* ─── Quick Templates ─── */
@@ -4871,6 +5014,15 @@ function wireEvents() {
   }
   const receiptLightbox = document.getElementById("receiptLightbox");
   if (receiptLightbox) receiptLightbox.addEventListener("click", closeLightbox);
+
+  // ── Category trends picker ──
+  const trendPicker = document.getElementById("trendCategoryPicker");
+  if (trendPicker) {
+    trendPicker.addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-cat-id]");
+      if (chip) toggleTrendCategory(chip.dataset.catId);
+    });
+  }
 
   // ── Calendar day detail ──
   const heatmapCalendar = document.getElementById("heatmapCalendar");

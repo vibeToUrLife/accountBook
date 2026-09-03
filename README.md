@@ -20,7 +20,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 ### Insights & reporting
 - **Statistics** by weekly / monthly / yearly range, with category breakdown and charts
 - Spending **projections** (daily average, projected total, days left)
-- **Dashboard** — monthly overview, salary allocation, month-over-month comparison, cashflow chart, spending heatmap, category trends, and budget alerts
+- **Dashboard** — monthly overview, salary allocation, month-over-month comparison, cashflow chart, spending heatmap, category trends (pick any of your own categories to plot), and budget alerts
 - Auto-generated **spending insights**
 - Search and **advanced filters** (date range, type, category, amount range, tag)
 

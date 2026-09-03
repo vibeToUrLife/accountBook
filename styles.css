@@ -1093,6 +1093,20 @@ input:focus, select:focus, textarea:focus {
 }
 .stats-cat-chip:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
 .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+
+/* category trends picker */
+.trend-cat-picker { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 4px; }
+.trend-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 10px; border-radius: 999px;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: 12px; color: var(--muted); cursor: pointer;
+  transition: border-color 0.12s, color 0.12s, background 0.12s;
+}
+.trend-chip:hover { border-color: var(--accent); color: var(--text); }
+.trend-chip.active { color: var(--text); border-color: var(--accent); background: var(--accent-soft); }
+.trend-chip-name { font-weight: 600; }
+.trend-chip-amount { font-variant-numeric: tabular-nums; opacity: 0.75; }
 .cat-chip-name { font-weight: 600; color: var(--text); }
 .cat-chip-amount { font-weight: 700; color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 

@@ -1,9 +1,9 @@
-const CACHE_NAME = "accountbook-v14";
-const CDN_CACHE = "accountbook-cdn-v14";
+const CACHE_NAME = "accountbook-v15";
+const CDN_CACHE = "accountbook-cdn-v15";
 const PRECACHE = [
   "./index.html",
-  "./styles.css?v=10",
-  "./app.js?v=9",
+  "./styles.css?v=11",
+  "./app.js?v=10",
   "./utils.js?v=6",
   "./firebase.js",
   "./firebase-config.js",
