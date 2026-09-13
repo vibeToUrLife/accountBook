@@ -2,6 +2,7 @@
 // Self-contained: receives a shared `ctx` (live state getters + helpers + firestore)
 // from the core (app.js). Reads current state via ctx.* getters; writes go through
 // Firestore, and the core's onSnapshot listeners refresh state + re-render.
+import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createDebts(ctx) {
   const { money, icon, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
   const { addDoc, setDoc, deleteDoc, doc, serverTimestamp } = firestore;
@@ -21,14 +22,14 @@ export function createDebts(ctx) {
     if (summary) {
       const netCls = net >= 0 ? "revenue" : "expense";
       summary.innerHTML = `
-        <div class="debt-summary-item"><span class="debt-summary-label">Owed to me</span><span class="debt-summary-value revenue">${money(owedToMe)}</span></div>
-        <div class="debt-summary-item"><span class="debt-summary-label">I owe</span><span class="debt-summary-value expense">${money(iOwe)}</span></div>
-        <div class="debt-summary-item"><span class="debt-summary-label">Net</span><span class="debt-summary-value ${netCls}">${money(net)}</span></div>`;
+        <div class="debt-summary-item"><span class="debt-summary-label">${t("Owed to me")}</span><span class="debt-summary-value revenue">${money(owedToMe)}</span></div>
+        <div class="debt-summary-item"><span class="debt-summary-label">${t("I owe")}</span><span class="debt-summary-value expense">${money(iOwe)}</span></div>
+        <div class="debt-summary-item"><span class="debt-summary-label">${t("Net")}</span><span class="debt-summary-value ${netCls}">${money(net)}</span></div>`;
     }
 
     const visible = showSettled ? ctx.debts : outstanding;
     if (visible.length === 0) {
-      container.innerHTML = '<div class="muted small">No debts to show.</div>';
+      container.innerHTML = `<div class="muted small">${t("No debts to show.")}</div>`;
       return;
     }
 
@@ -36,11 +37,11 @@ export function createDebts(ctx) {
     container.innerHTML = visible.map((d) => {
       const settled = d.status === "settled";
       const isOwedToMe = d.direction === "owed_to_me";
-      const dirLabel = isOwedToMe ? "owes me" : "I owe";
+      const dirLabel = isOwedToMe ? t("owes me") : t("I owe");
       const amtCls = isOwedToMe ? "revenue" : "expense";
       const overdue = !settled && d.dueDate && d.dueDate < today;
       const due = d.dueDate
-        ? `<span class="debt-due ${overdue ? "overdue" : ""}">Due ${escapeHtml(d.dueDate)}${overdue ? " · overdue" : ""}</span>`
+        ? `<span class="debt-due ${overdue ? "overdue" : ""}">${t("Due {date}", { date: escapeHtml(d.dueDate) })}${overdue ? " · " + t("overdue") : ""}</span>`
         : "";
       const note = d.note ? `<span class="debt-note">${escapeHtml(d.note)}</span>` : "";
       return `<div class="debt-card ${settled ? "settled" : ""}">
@@ -50,9 +51,9 @@ export function createDebts(ctx) {
         </div>
         <div class="debt-actions">
           ${settled
-            ? `<span class="debt-settled-tag">${icon("check", "icon-sm")} Settled</span>`
-            : `<button class="btn btn-secondary btn-small" type="button" data-action="settle-debt" data-id="${d.id}">Mark paid</button>`}
-          <button class="btn btn-danger btn-small" type="button" data-action="delete-debt" data-id="${d.id}">Delete</button>
+            ? `<span class="debt-settled-tag">${icon("check", "icon-sm")} ${t("Settled")}</span>`
+            : `<button class="btn btn-secondary btn-small" type="button" data-action="settle-debt" data-id="${d.id}">${t("Mark paid")}</button>`}
+          <button class="btn btn-danger btn-small" type="button" data-action="delete-debt" data-id="${d.id}">${t("Delete")}</button>
         </div>
       </div>`;
     }).join("");

@@ -1,6 +1,7 @@
 // Recurring Transactions feature module. Owns the auto-run gating flags
 // internally; the core's listeners call markTransactionsLoaded/markRecurringLoaded
 // + autoRun(), and reset() on sign-out.
+import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createRecurring(ctx) {
   const { money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, clamp, setAppError, showUndoToast, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, doc, serverTimestamp } = firestore;
@@ -30,20 +31,20 @@ export function createRecurring(ctx) {
     }
 
     if (ctx.recurringRules.length === 0) {
-      container.innerHTML = '<div class="muted small">No recurring rules yet.</div>';
+      container.innerHTML = `<div class="muted small">${t("No recurring rules yet.")}</div>`;
       return;
     }
 
     container.innerHTML = ctx.recurringRules.map((r) => {
       const cat = ctx.categories.find((c) => c.id === r.categoryId);
-      const catName = cat ? cat.name : "(Unknown)";
-      const typeLabel = r.type === "expense" ? "Expense" : "Revenue";
+      const catName = cat ? cat.name : t("(Unknown)");
+      const typeLabel = r.type === "expense" ? t("Expense") : t("Revenue");
       return `<div class="recurring-card">
         <div class="recurring-info">
           <div class="recurring-name">${escapeHtml(catName)} — ${escapeHtml(r.note || "")}</div>
-          <div class="recurring-detail">${typeLabel} · ${money(r.amount)} · Day ${r.dayOfMonth || 1} each month</div>
+          <div class="recurring-detail">${typeLabel} · ${money(r.amount)} · ${t("Day {day} each month", { day: r.dayOfMonth || 1 })}</div>
         </div>
-        <button class="btn btn-danger btn-small" type="button" data-action="delete-recurring" data-id="${r.id}">Delete</button>
+        <button class="btn btn-danger btn-small" type="button" data-action="delete-recurring" data-id="${r.id}">${t("Delete")}</button>
       </div>`;
     }).join("");
   }
@@ -117,7 +118,7 @@ export function createRecurring(ctx) {
 
     const count = await addDueRules(due, dateISO);
     if (count > 0) {
-      showUndoToast({ message: `Auto-added ${count} recurring transaction(s).`, onUndo: () => {} });
+      showUndoToast({ message: t("Auto-added {n} recurring transaction(s).", { n: count }), onUndo: () => {} });
     }
   }
 
@@ -126,11 +127,11 @@ export function createRecurring(ctx) {
     const dateISO = todayISO();
     const due = ctx.recurringRules.filter((r) => (r.dayOfMonth || 1) === dayOfMonth);
     if (due.length === 0) {
-      setAppError("No recurring transactions due today (day " + dayOfMonth + ").");
+      setAppError(t("No recurring transactions due today (day {day}).", { day: dayOfMonth }));
       return;
     }
     const count = await addDueRules(due, dateISO);
-    setAppError(count > 0 ? `Added ${count} recurring transaction(s).` : "All due recurring transactions already recorded today.");
+    setAppError(count > 0 ? t("Added {n} recurring transaction(s).", { n: count }) : t("All due recurring transactions already recorded today."));
   }
 
   return {

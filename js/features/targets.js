@@ -2,6 +2,7 @@
 // A checklist timeline of things you want to achieve (not just money) by a
 // certain age. Items are sorted into a timeline by their target age; each can
 // be ticked off when achieved, edited in place, or removed.
+import { t as tr } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createTargets(ctx) {
   const { icon, escapeHtml, normalizeText, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, setDoc, doc, serverTimestamp } = firestore;
@@ -35,7 +36,7 @@ export function createTargets(ctx) {
   }
 
   function yearsLabel(n) {
-    return `${n} yr${n === 1 ? "" : "s"}`;
+    return n === 1 ? tr("1 yr") : tr("{n} yrs", { n });
   }
 
   function renderTargets() {
@@ -66,7 +67,7 @@ export function createTargets(ctx) {
       editingId = null;
       clearDraft();
       container.innerHTML =
-        '<div class="muted small">No targets yet. Add something you want to achieve above!</div>';
+        `<div class="muted small">${tr("No targets yet. Add something you want to achieve above!")}</div>`;
       if (summaryEl) summaryEl.textContent = "";
       return;
     }
@@ -89,7 +90,7 @@ export function createTargets(ctx) {
       .join("");
 
     if (summaryEl) {
-      summaryEl.textContent = `${doneCount} of ${list.length} achieved`;
+      summaryEl.textContent = tr("{done} of {total} achieved", { done: doneCount, total: list.length });
     }
   }
 
@@ -97,35 +98,35 @@ export function createTargets(ctx) {
     const age = t.age || 0;
     const done = !!t.done;
 
-    let when = `Age ${age}`;
+    let when = tr("Age {age}", { age });
     let whenClass = "";
     if (done) {
-      when = `Age ${age} · Achieved`;
+      when = tr("Age {age} · Achieved", { age });
     } else if (currentAge != null) {
       const diff = age - currentAge;
-      if (diff > 0) when = `Age ${age} · in ${yearsLabel(diff)}`;
-      else if (diff === 0) { when = `Age ${age} · this year`; whenClass = "due"; }
-      else { when = `Age ${age} · ${yearsLabel(-diff)} overdue`; whenClass = "overdue"; }
+      if (diff > 0) when = tr("Age {age} · in {years}", { age, years: yearsLabel(diff) });
+      else if (diff === 0) { when = tr("Age {age} · this year", { age }); whenClass = "due"; }
+      else { when = tr("Age {age} · {years} overdue", { age, years: yearsLabel(-diff) }); whenClass = "overdue"; }
     }
 
     return `<div class="target-item ${done ? "done" : ""}">
       <div class="target-node">${age}</div>
       <div class="target-body">
-        <div class="target-text">${escapeHtml(t.text || "Untitled")}</div>
+        <div class="target-text">${escapeHtml(t.text || tr("Untitled"))}</div>
         <div class="target-when ${whenClass}">${when}</div>
       </div>
       <div class="target-actions">
         <button class="target-check ${done ? "checked" : ""}" type="button"
           data-action="toggle-target" data-id="${t.id}"
-          aria-label="${done ? "Mark as not achieved" : "Mark as achieved"}"
-          title="${done ? "Mark as not achieved" : "Mark as achieved"}">
+          aria-label="${done ? tr("Mark as not achieved") : tr("Mark as achieved")}"
+          title="${done ? tr("Mark as not achieved") : tr("Mark as achieved")}">
           ${done ? icon("check", "icon-sm") : ""}
         </button>
         <button class="btn btn-secondary btn-small" type="button"
           data-action="edit-target" data-id="${t.id}"
-          aria-label="Edit target" title="Edit">${icon("edit", "icon-sm")}</button>
+          aria-label="${tr("Edit target")}" title="${tr("Edit")}">${icon("edit", "icon-sm")}</button>
         <button class="btn btn-danger btn-small" type="button"
-          data-action="delete-target" data-id="${t.id}">Delete</button>
+          data-action="delete-target" data-id="${t.id}">${tr("Delete")}</button>
       </div>
     </div>`;
   }
@@ -140,16 +141,16 @@ export function createTargets(ctx) {
       <div class="target-body target-edit-body">
         <input class="target-edit-input" type="text" maxlength="80" data-edit-text
           value="${escapeHtml(String(draft.text))}"
-          placeholder="What do you want to achieve?" aria-label="Target description" />
+          placeholder="${tr("What do you want to achieve?")}" aria-label="${tr("Target description")}" />
         <input class="target-edit-input target-edit-age" type="number" min="1" max="120" step="1"
           data-edit-age value="${escapeHtml(String(draft.age))}"
-          placeholder="Age" aria-label="Target age" />
+          placeholder="${tr("Age")}" aria-label="${tr("Target age")}" />
       </div>
       <div class="target-actions">
         <button class="btn btn-small" type="button"
-          data-action="save-target" data-id="${t.id}">Save</button>
+          data-action="save-target" data-id="${t.id}">${tr("Save")}</button>
         <button class="btn btn-secondary btn-small" type="button"
-          data-action="cancel-target">Cancel</button>
+          data-action="cancel-target">${tr("Cancel")}</button>
       </div>
     </div>`;
   }

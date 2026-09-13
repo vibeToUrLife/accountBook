@@ -29,6 +29,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - **Smart assistant** — add records by voice or text in English / Chinese / mixed
 - **Budget alerts** — browser notifications at 80% and over-budget
 - **Help & Guide** view explaining every feature in plain words, a "What's this?" link on each screen, and a first-run tip for new users
+- **English / 简体中文** interface: switch with the EN / 中文 button in the header; the choice is remembered, and a Chinese browser gets Chinese by default
 - Light / **dark mode**
 - Custom currency symbol
 - **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup
@@ -80,7 +81,7 @@ From this folder run:
 Then open: http://localhost:5500
 
 ## Tests
-Pure logic (upcoming-items date math, savings-goal progress) has unit tests that run on Node 22+ with no dependencies:
+Pure logic (upcoming-items date math, savings-goal progress, the translation layer and its dictionary coverage) has unit tests that run on Node 22+ with no dependencies:
 
 - `node --test`
 
@@ -89,6 +90,7 @@ Pure logic (upcoming-items date math, savings-goal progress) has unit tests that
 - `app.js` — main application logic
 - `firebase.js` / `firebase-config.js` — Firebase init and config
 - `utils.js` — shared helpers
+- `js/i18n.js` / `js/i18n.zh.js` — translation layer and the Simplified Chinese dictionary (English text is the key)
 - `js/features/` — feature modules (goals, upcoming, recurring, debts, subscriptions, templates, receipts)
 - `tests/` — unit tests for the pure feature logic
 - `styles.css` — styling (light/dark theme)

@@ -1,6 +1,7 @@
 // Receipt photos feature module. Owns the pending-photo queue and the viewer
 // state internally. Photos live in a per-transaction `receipts` subcollection;
 // the transaction carries only a tiny `receiptCount`.
+import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createReceipts(ctx) {
   const { icon, userCollections, firestore } = ctx;
   const { collection, doc, addDoc, getDocs, deleteDoc, setDoc, serverTimestamp, query, orderBy } = firestore;
@@ -67,8 +68,8 @@ export function createReceipts(ctx) {
     if (!strip) return;
     strip.innerHTML = pendingReceipts.map((url, i) =>
       `<div class="receipt-thumb">
-        <img src="${url}" alt="Pending photo ${i + 1}" data-action="view-pending" data-idx="${i}" />
-        <button type="button" class="receipt-thumb-remove" data-action="remove-pending" data-idx="${i}" title="Remove" aria-label="Remove">${icon("x", "icon-sm")}</button>
+        <img src="${url}" alt="${t("Pending photo {n}", { n: i + 1 })}" data-action="view-pending" data-idx="${i}" />
+        <button type="button" class="receipt-thumb-remove" data-action="remove-pending" data-idx="${i}" title="${t("Remove")}" aria-label="${t("Remove")}">${icon("x", "icon-sm")}</button>
       </div>`
     ).join("");
   }
@@ -125,18 +126,18 @@ export function createReceipts(ctx) {
     const grid = document.getElementById("receiptViewerGrid");
     const status = document.getElementById("receiptViewerStatus");
     if (!grid || !receiptViewerTxId) return;
-    grid.innerHTML = '<div class="muted small">Loading…</div>';
+    grid.innerHTML = `<div class="muted small">${t("Loading…")}</div>`;
     let docs = [];
     try {
       const snap = await getDocs(query(receiptsCol(receiptViewerTxId), orderBy("createdAt", "asc")));
       docs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     } catch { /* ignore */ }
-    if (status) status.textContent = docs.length ? `${docs.length} photo${docs.length > 1 ? "s" : ""}` : "";
-    if (!docs.length) { grid.innerHTML = '<div class="muted small">No photos yet. Add some above.</div>'; return; }
+    if (status) status.textContent = docs.length ? (docs.length === 1 ? t("1 photo") : t("{n} photos", { n: docs.length })) : "";
+    if (!docs.length) { grid.innerHTML = `<div class="muted small">${t("No photos yet. Add some above.")}</div>`; return; }
     grid.innerHTML = docs.map((r) =>
       `<div class="receipt-thumb">
-        <img src="${r.dataUrl}" alt="Photo" data-action="view-receipt" />
-        <button type="button" class="receipt-thumb-remove" data-action="delete-receipt" data-id="${r.id}" title="Delete" aria-label="Delete">${icon("x", "icon-sm")}</button>
+        <img src="${r.dataUrl}" alt="${t("Photo")}" data-action="view-receipt" />
+        <button type="button" class="receipt-thumb-remove" data-action="delete-receipt" data-id="${r.id}" title="${t("Delete")}" aria-label="${t("Delete")}">${icon("x", "icon-sm")}</button>
       </div>`
     ).join("");
   }
@@ -144,7 +145,7 @@ export function createReceipts(ctx) {
   async function addReceiptsFromViewer(fileList) {
     if (!receiptViewerTxId) return;
     const status = document.getElementById("receiptViewerStatus");
-    if (status) status.textContent = "Adding…";
+    if (status) status.textContent = t("Adding…");
     const urls = await filesToDataUrls(fileList);
     await saveReceiptsForTx(receiptViewerTxId, urls);
     await bumpReceiptCount(receiptViewerTxId, urls.length);

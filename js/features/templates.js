@@ -1,4 +1,5 @@
 // Quick Templates feature module. Reads/writes the form via ctx.els.
+import { t as tr } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createTemplates(ctx) {
   const { els, money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, setAppError, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, doc, serverTimestamp } = firestore;
@@ -12,7 +13,7 @@ export function createTemplates(ctx) {
       } else {
         els.templateChipsWrap.hidden = false;
         els.templateChips.innerHTML = ctx.templates.map((t) =>
-          `<button type="button" class="template-chip" data-action="apply-template" data-id="${t.id}">${escapeHtml(t.label || t.note || t.categoryName || "Template")}</button>`
+          `<button type="button" class="template-chip" data-action="apply-template" data-id="${t.id}">${escapeHtml(t.label || t.note || t.categoryName || tr("Template"))}</button>`
         ).join("");
       }
     }
@@ -20,14 +21,14 @@ export function createTemplates(ctx) {
     // Management list in Settings
     if (els.templateManageList) {
       if (!ctx.templates.length) {
-        els.templateManageList.innerHTML = '<div class="muted small">No templates yet.</div>';
+        els.templateManageList.innerHTML = `<div class="muted small">${tr("No templates yet.")}</div>`;
       } else {
         els.templateManageList.innerHTML = ctx.templates.map((t) => {
-          const typeLabel = t.type === "revenue" ? "Revenue" : "Expense";
+          const typeLabel = t.type === "revenue" ? tr("Revenue") : tr("Expense");
           const amt = t.amount ? money(t.amount) : "";
           return `<div class="template-manage-item">
-            <span class="template-manage-info">${escapeHtml(t.label || t.note || "Template")} — ${escapeHtml(t.categoryName || "(no category)")} · ${typeLabel}${amt ? " · " + amt : ""}</span>
-            <button type="button" class="btn btn-danger btn-small" data-action="delete-template" data-id="${t.id}">Delete</button>
+            <span class="template-manage-info">${escapeHtml(t.label || t.note || tr("Template"))} — ${escapeHtml(t.categoryName || tr("(no category)"))} · ${typeLabel}${amt ? " · " + amt : ""}</span>
+            <button type="button" class="btn btn-danger btn-small" data-action="delete-template" data-id="${t.id}">${tr("Delete")}</button>
           </div>`;
         }).join("");
       }
@@ -41,10 +42,10 @@ export function createTemplates(ctx) {
     const note = normalizeText(els.txNote.value);
     const category = ctx.categories.find((c) => c.id === categoryId);
     if (!categoryId) {
-      setAppError("Pick a category before saving a template.");
+      setAppError(tr("Pick a category before saving a template."));
       return;
     }
-    const label = (note || category?.name || "Template").slice(0, 40);
+    const label = (note || category?.name || tr("Template")).slice(0, 40);
     const { templates: templatesCol } = userCollections(ctx.uid);
     await addDoc(templatesCol, {
       label,

@@ -1,6 +1,7 @@
 // Subscriptions feature module. Awareness tracker + "Pay & Record" (logs an
 // expense and rolls the renewal date forward one cycle). Receives the shared
 // `ctx` from the core; reads live state via ctx.* and writes through Firestore.
+import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createSubscriptions(ctx) {
   const { money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
   const { addDoc, setDoc, deleteDoc, doc, serverTimestamp } = firestore;
@@ -44,21 +45,21 @@ export function createSubscriptions(ctx) {
     const yearly = active.reduce((sum, s) => sum + (s.cycle === "year" ? (s.amount || 0) : (s.amount || 0) * 12), 0);
     if (summary) {
       summary.innerHTML = `
-        <div class="debt-summary-item"><span class="debt-summary-label">Per month</span><span class="debt-summary-value expense">${money(monthly)}</span></div>
-        <div class="debt-summary-item"><span class="debt-summary-label">Per year</span><span class="debt-summary-value expense">${money(yearly)}</span></div>
-        <div class="debt-summary-item"><span class="debt-summary-label">Active</span><span class="debt-summary-value">${active.length}</span></div>`;
+        <div class="debt-summary-item"><span class="debt-summary-label">${t("Per month")}</span><span class="debt-summary-value expense">${money(monthly)}</span></div>
+        <div class="debt-summary-item"><span class="debt-summary-label">${t("Per year")}</span><span class="debt-summary-value expense">${money(yearly)}</span></div>
+        <div class="debt-summary-item"><span class="debt-summary-label">${t("Active")}</span><span class="debt-summary-value">${active.length}</span></div>`;
     }
 
     const visible = showCancelled ? ctx.subscriptions : active;
     if (visible.length === 0) {
-      container.innerHTML = '<div class="muted small">No subscriptions to show.</div>';
+      container.innerHTML = `<div class="muted small">${t("No subscriptions to show.")}</div>`;
       return;
     }
 
     const today = todayISO();
     container.innerHTML = visible.map((s) => {
       const cancelled = s.status === "cancelled";
-      const cycleLabel = s.cycle === "year" ? "Yearly" : "Monthly";
+      const cycleLabel = s.cycle === "year" ? t("Yearly") : t("Monthly");
 
       // Due state drives both the label and the Pay button
       const days = s.nextRenewal ? daysBetween(today, s.nextRenewal) : 0;
@@ -66,17 +67,17 @@ export function createSubscriptions(ctx) {
       const isDue = !s.nextRenewal || days <= 0; // payable today or past
       let dueClass = "", dueText = "";
       if (s.nextRenewal) {
-        if (days < 0) { dueClass = "overdue"; dueText = `Overdue · ${s.nextRenewal}`; }
-        else if (days === 0) { dueClass = "overdue"; dueText = "Renews today"; }
-        else if (days <= 3) { dueClass = "soon"; dueText = `Renews in ${days} day${days > 1 ? "s" : ""}`; }
-        else { dueText = `Renews ${s.nextRenewal}`; }
+        if (days < 0) { dueClass = "overdue"; dueText = t("Overdue · {date}", { date: s.nextRenewal }); }
+        else if (days === 0) { dueClass = "overdue"; dueText = t("Renews today"); }
+        else if (days <= 3) { dueClass = "soon"; dueText = days === 1 ? t("Renews in 1 day") : t("Renews in {n} days", { n: days }); }
+        else { dueText = t("Renews {date}", { date: s.nextRenewal }); }
       }
       const cat = ctx.categories.find((c) => c.id === s.categoryId);
       const catName = cat ? cat.name : (s.categoryName || "");
 
       const payAttrs = isDue
         ? `class="btn btn-small ${isOverdue ? "btn-danger" : ""}"`
-        : `class="btn btn-small" disabled title="Already paid — next renewal ${escapeHtml(s.nextRenewal || "")}"`;
+        : `class="btn btn-small" disabled title="${t("Already paid — next renewal {date}", { date: escapeHtml(s.nextRenewal || "") })}"`;
 
       return `<div class="debt-card ${cancelled ? "settled" : ""}">
         <div class="debt-info">
@@ -85,10 +86,10 @@ export function createSubscriptions(ctx) {
         </div>
         <div class="debt-actions">
           ${cancelled
-            ? `<span class="debt-settled-tag">Cancelled</span>`
-            : `<button ${payAttrs} type="button" data-action="pay-sub" data-id="${s.id}">Pay &amp; Record</button>
-               <button class="btn btn-secondary btn-small" type="button" data-action="cancel-sub" data-id="${s.id}">Cancel</button>`}
-          <button class="btn btn-danger btn-small" type="button" data-action="delete-sub" data-id="${s.id}">Delete</button>
+            ? `<span class="debt-settled-tag">${t("Cancelled")}</span>`
+            : `<button ${payAttrs} type="button" data-action="pay-sub" data-id="${s.id}">${escapeHtml(t("Pay & Record"))}</button>
+               <button class="btn btn-secondary btn-small" type="button" data-action="cancel-sub" data-id="${s.id}">${t("Cancel")}</button>`}
+          <button class="btn btn-danger btn-small" type="button" data-action="delete-sub" data-id="${s.id}">${t("Delete")}</button>
         </div>
       </div>`;
     }).join("");
@@ -133,7 +134,7 @@ export function createSubscriptions(ctx) {
 
     const category = ctx.categories.find((c) => c.id === sub.categoryId);
     const categoryName = category ? category.name : (sub.categoryName || "(Unknown)");
-    const note = `${sub.name} subscription`;
+    const note = t("{name} subscription", { name: sub.name });
 
     const { transactions: txCol, subscriptions: subsCol } = userCollections(ctx.uid);
     await addDoc(txCol, {

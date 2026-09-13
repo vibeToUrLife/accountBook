@@ -34,6 +34,7 @@ import { createTemplates } from "./js/features/templates.js";
 import { createReceipts } from "./js/features/receipts.js";
 import { createRecurring } from "./js/features/recurring.js";
 import { createUpcoming } from "./js/features/upcoming.js?v=1";
+import { t, initLang, getLang, setLang, translateDom, locale } from "./js/i18n.js?v=1";
 
 const {
   collection,
@@ -307,7 +308,7 @@ function applyTheme(theme) {
   if (els.themeToggleBtn) {
     els.themeToggleBtn.setAttribute("aria-pressed", String(isDark));
     els.themeToggleBtn.innerHTML = isDark ? icon("sun") : icon("moon");
-    els.themeToggleBtn.title = isDark ? "Switch to light mode" : "Switch to dark mode";
+    els.themeToggleBtn.title = isDark ? t("Switch to light mode") : t("Switch to dark mode");
   }
 
   // Update chart colors to match the theme.
@@ -432,7 +433,7 @@ function budgetRangeForPeriod(budgetPeriod, referenceDate) {
     return {
       start,
       endExclusive,
-      periodLabel: "Monthly",
+      periodLabel: t("Monthly"),
       scopeLabel: currentMonthValue(start),
       rangeLabel: `${dateObjToISO(start)} → ${dateObjToISO(addDays(endExclusive, -1))}`,
     };
@@ -445,7 +446,7 @@ function budgetRangeForPeriod(budgetPeriod, referenceDate) {
     return {
       start,
       endExclusive,
-      periodLabel: "Yearly",
+      periodLabel: t("Yearly"),
       scopeLabel: String(start.getFullYear()),
       rangeLabel: `${dateObjToISO(start)} → ${dateObjToISO(addDays(endExclusive, -1))}`,
     };
@@ -454,9 +455,9 @@ function budgetRangeForPeriod(budgetPeriod, referenceDate) {
   return {
     start: null,
     endExclusive: null,
-    periodLabel: "Lifetime",
-    scopeLabel: "All time",
-    rangeLabel: "All records",
+    periodLabel: t("Lifetime"),
+    scopeLabel: t("All time"),
+    rangeLabel: t("All records"),
   };
 }
 
@@ -483,8 +484,8 @@ function setStatsRangeLabel(range, start, endExclusive) {
   const endInclusive = addDays(endExclusive, -1);
   const startISO = dateObjToISO(start);
   const endISO = dateObjToISO(endInclusive);
-  const prefix = range === "week" ? "Week" : range === "month" ? "Month" : "Year";
-  els.statsRangeLabel.textContent = `${prefix} range: ${startISO} → ${endISO}`;
+  const prefix = range === "week" ? t("Week") : range === "month" ? t("Month") : t("Year");
+  els.statsRangeLabel.textContent = t("{prefix} range: {start} → {end}", { prefix, start: startISO, end: endISO });
 }
 
 
@@ -502,7 +503,7 @@ async function renderStatsChart(range, start, endExclusive) {
       statsChartInstance.destroy();
       statsChartInstance = null;
     }
-    setStatsChartMessage("Chart couldn’t load (network/CDN blocked). Try another network or disable ad-block for this site.");
+    setStatsChartMessage(t("Chart couldn’t load (network/CDN blocked). Try another network or disable ad-block for this site."));
     return;
   }
 
@@ -527,10 +528,10 @@ async function renderStatsChart(range, start, endExclusive) {
 
   // Helper to get category name
   const getCatName = (id) => {
-    if (id === "uncategorized") return "Uncategorized";
+    if (id === "uncategorized") return t("Uncategorized");
     const c = categories.find((cat) => cat.id === id);
     if (!c) return null; // deleted category – skip
-    return c.name || "Unnamed";
+    return c.name || t("Unnamed");
   };
 
   // Sort categories by amount desc
@@ -549,7 +550,7 @@ async function renderStatsChart(range, start, endExclusive) {
       statsChartInstance.destroy();
       statsChartInstance = null;
     }
-    setStatsChartMessage("No expense data in this range.");
+    setStatsChartMessage(t("No expense data in this range."));
     return;
   }
 
@@ -642,7 +643,7 @@ async function renderStatsChart(range, start, endExclusive) {
       c.fillStyle = text;
       c.font = "600 12px system-ui, -apple-system, sans-serif";
       c.globalAlpha = 0.7;
-      c.fillText("Total", cx, cy - 11);
+      c.fillText(t("Total"), cx, cy - 11);
       c.globalAlpha = 1;
       c.font = "700 17px system-ui, -apple-system, sans-serif";
       c.fillText(money(totalExpense), cx, cy + 8);
@@ -660,7 +661,7 @@ async function renderStatsChart(range, start, endExclusive) {
     setStatsChartMessage("");
   } catch {
     statsChartInstance = null;
-    setStatsChartMessage("Chart failed to render. Please refresh and try again.");
+    setStatsChartMessage(t("Chart failed to render. Please refresh and try again."));
   }
 }
 
@@ -681,7 +682,7 @@ function ensureStatsYearOptions() {
   if (years.length === 0) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "No years yet";
+    opt.textContent = t("No years yet");
     opt.disabled = true;
     opt.selected = true;
     els.statsYear.appendChild(opt);
@@ -705,7 +706,7 @@ function ensureStatsYearOptions() {
 function renderBudgetScopeLabel() {
   const monthValue = els.budgetMonth.value || currentMonthValue();
   const yearValue = String(budgetMonthRefDate().getFullYear());
-  els.budgetScope.textContent = `Budget month: ${monthValue} • Yearly budgets: ${yearValue}`;
+  els.budgetScope.textContent = t("Budget month: {month} • Yearly budgets: {year}", { month: monthValue, year: yearValue });
 }
 
 function setStatsInputVisibility() {
@@ -940,21 +941,21 @@ function stripUndefined(value) {
 function friendlyDbError(err) {
   const code = err?.code || "";
   if (code === "permission-denied") {
-    return "Permission denied by Firestore Rules. Check that you’re signed in and that your Firestore rules allow read/write for this user.";
+    return t("Permission denied by Firestore Rules. Check that you’re signed in and that your Firestore rules allow read/write for this user.");
   }
   if (code === "unauthenticated") {
-    return "You’re signed out. Please sign in again.";
+    return t("You’re signed out. Please sign in again.");
   }
   if (code === "unavailable") {
-    return "Firestore is temporarily unavailable (network/offline). Check your connection and try again.";
+    return t("Firestore is temporarily unavailable (network/offline). Check your connection and try again.");
   }
   if (code === "resource-exhausted") {
-    return "Quota exceeded (resource exhausted). Try again later or check Firebase usage/quota.";
+    return t("Quota exceeded (resource exhausted). Try again later or check Firebase usage/quota.");
   }
   if (code === "not-found") {
-    return "Item not found (it may have been deleted in another tab).";
+    return t("Item not found (it may have been deleted in another tab).");
   }
-  return err?.message || "Operation failed.";
+  return err?.message || t("Operation failed.");
 }
 
 async function withDisabled(elements, fn) {
@@ -996,7 +997,7 @@ function renderCategorySelect() {
   if (categories.length === 0) {
     const opt = document.createElement("option");
     opt.value = "";
-    opt.textContent = "Add a category first";
+    opt.textContent = t("Add a category first");
     els.txCategory.appendChild(opt);
     els.txCategory.disabled = true;
     return;
@@ -1022,7 +1023,7 @@ function renderCategoriesTable() {
 
   if (categories.length === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="7" class="muted">No categories yet.</td>`;
+    tr.innerHTML = `<td colspan="7" class="muted">${t("No categories yet.")}</td>`;
     els.categoryTbody.appendChild(tr);
     return;
   }
@@ -1044,10 +1045,10 @@ function renderCategoriesTable() {
 
     const periodLabel =
       period === "month"
-        ? `Monthly`
+        ? t("Monthly")
         : period === "year"
-          ? `Yearly`
-          : "Lifetime";
+          ? t("Yearly")
+          : t("Lifetime");
 
     const hasBudget = budgetAmount > 0;
     // Raw (uncapped) percentage so we can tell "fully used" (=100%) apart from "over" (>100%).
@@ -1059,13 +1060,13 @@ function renderCategoriesTable() {
     if (hasBudget && spent > 0) {
       if (rawUsedPct > 100) {
         statusClass = 'budget-over';
-        statusLabel = `<span class="budget-badge over">Over by ${money(overAmount)}</span>`;
+        statusLabel = `<span class="budget-badge over">${t("Over by {amount}", { amount: money(overAmount) })}</span>`;
       } else if (rawUsedPct >= 100) {
         statusClass = 'budget-full';
-        statusLabel = '<span class="budget-badge full">Fully used</span>';
+        statusLabel = `<span class="budget-badge full">${t("Fully used")}</span>`;
       } else if (rawUsedPct >= 80) {
         statusClass = 'budget-warn';
-        statusLabel = `<span class="budget-badge warn">${Math.round(rawUsedPct)}% used</span>`;
+        statusLabel = `<span class="budget-badge warn">${t("{pct}% used", { pct: Math.round(rawUsedPct) })}</span>`;
       }
     }
 
@@ -1077,7 +1078,7 @@ function renderCategoriesTable() {
     tr.dataset.categoryId = c.id;
     tr.classList.add("clickable-row", statusClass, "budget-card-row");
     tr.tabIndex = 0;
-    tr.setAttribute("aria-label", `${c.name} budget. Press Enter to view records.`);
+    tr.setAttribute("aria-label", t("{name} budget. Press Enter to view records.", { name: c.name }));
     if (c.id === activeCategoryId) tr.classList.add("selected");
 
     const progressHtml = hasBudget ? `
@@ -1090,30 +1091,30 @@ function renderCategoriesTable() {
 
     const statsHtml = hasBudget ? `
           <div class="budget-card-stats">
-            <div class="budget-stat"><span class="budget-stat-label">Budget</span><span class="budget-stat-val">${money(budgetAmount)}</span></div>
-            <div class="budget-stat"><span class="budget-stat-label">Spent</span><span class="budget-stat-val val-negative">${money(spent)}</span></div>
-            <div class="budget-stat"><span class="budget-stat-label">Income</span><span class="budget-stat-val val-positive">${money(income)}</span></div>
-            <div class="budget-stat"><span class="budget-stat-label">Balance</span><span class="budget-stat-val ${effectiveBudgetBalance > 0 ? 'val-positive' : effectiveBudgetBalance < 0 ? 'val-negative' : ''}">${money(effectiveBudgetBalance)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Budget")}</span><span class="budget-stat-val">${money(budgetAmount)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Spent")}</span><span class="budget-stat-val val-negative">${money(spent)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Income")}</span><span class="budget-stat-val val-positive">${money(income)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Balance")}</span><span class="budget-stat-val ${effectiveBudgetBalance > 0 ? 'val-positive' : effectiveBudgetBalance < 0 ? 'val-negative' : ''}">${money(effectiveBudgetBalance)}</span></div>
           </div>` : `
           <div class="budget-card-stats budget-card-stats-3">
-            <div class="budget-stat"><span class="budget-stat-label">Spent</span><span class="budget-stat-val val-negative">${money(spent)}</span></div>
-            <div class="budget-stat"><span class="budget-stat-label">Income</span><span class="budget-stat-val val-positive">${money(income)}</span></div>
-            <div class="budget-stat"><span class="budget-stat-label">Net</span><span class="budget-stat-val ${net > 0 ? 'val-positive' : net < 0 ? 'val-negative' : ''}">${money(net)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Spent")}</span><span class="budget-stat-val val-negative">${money(spent)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Income")}</span><span class="budget-stat-val val-positive">${money(income)}</span></div>
+            <div class="budget-stat"><span class="budget-stat-label">${t("Net")}</span><span class="budget-stat-val ${net > 0 ? 'val-positive' : net < 0 ? 'val-negative' : ''}">${money(net)}</span></div>
           </div>`;
 
     tr.innerHTML = `
       <td colspan="7" class="budget-card-cell">
         <div class="budget-card-inner">
           <div class="budget-card-top">
-            <div class="budget-card-name">${escapeHtml(c.name)} ${statusLabel}${!hasBudget ? '<span class="budget-badge no-limit">NO LIMIT</span>' : ''}</div>
+            <div class="budget-card-name">${escapeHtml(c.name)} ${statusLabel}${!hasBudget ? `<span class="budget-badge no-limit">${t("NO LIMIT")}</span>` : ''}</div>
             <div class="budget-card-period">${escapeHtml(periodLabel)}</div>
           </div>
           ${progressHtml}
           ${statsHtml}
-          <div class="budget-card-hint muted small">Click card to view records in this budget.</div>
+          <div class="budget-card-hint muted small">${t("Click card to view records in this budget.")}</div>
           <div class="budget-card-actions">
-            <button class="btn btn-small" type="button" data-action="edit-category" data-id="${c.id}">Edit</button>
-            <button class="btn btn-danger btn-small" type="button" data-action="delete-category" data-id="${c.id}">Delete</button>
+            <button class="btn btn-small" type="button" data-action="edit-category" data-id="${c.id}">${t("Edit")}</button>
+            <button class="btn btn-danger btn-small" type="button" data-action="delete-category" data-id="${c.id}">${t("Delete")}</button>
           </div>
         </div>
       </td>
@@ -1123,7 +1124,7 @@ function renderCategoriesTable() {
 
   if (renderedCount === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="7" class="muted">No budgets for this month yet.</td>`;
+    tr.innerHTML = `<td colspan="7" class="muted">${t("No budgets for this month yet.")}</td>`;
     els.categoryTbody.appendChild(tr);
   }
 }
@@ -1152,7 +1153,7 @@ function updateFilterSummary() {
   if (filters.dateFrom || filters.dateTo) {
     parts.push(`${filters.dateFrom || "…"} → ${filters.dateTo || "…"}`);
   }
-  if (filters.type) parts.push(filters.type);
+  if (filters.type) parts.push(filters.type === "expense" ? t("Expense") : t("Revenue"));
   if (filters.category) {
     const cat = categories.find((c) => c.id === filters.category);
     if (cat) parts.push(cat.name);
@@ -1160,7 +1161,7 @@ function updateFilterSummary() {
   if (filters.minAmount) parts.push(`≥ ${filters.minAmount}`);
   if (filters.maxAmount) parts.push(`≤ ${filters.maxAmount}`);
   if (filters.tag) parts.push(`#${filters.tag}`);
-  els.filterSummary.textContent = parts.length ? `Active: ${parts.join(" • ")}` : "";
+  els.filterSummary.textContent = parts.length ? t("Active: {list}", { list: parts.join(" • ") }) : "";
 }
 
 // Keeps the category filter dropdown in sync with the category list.
@@ -1168,7 +1169,7 @@ function renderFilterCategoryOptions() {
   if (!els.filterCategory) return;
   const current = filters.category;
   els.filterCategory.innerHTML =
-    '<option value="">All</option>' +
+    `<option value="">${t("All")}</option>` +
     categories
       .map((c) => `<option value="${c.id}">${escapeHtml(c.name)}</option>`)
       .join("");
@@ -1222,23 +1223,23 @@ function renderTransactionsTable() {
     const parts = [];
     if (activeCategoryId) {
       const cat = categories.find((c) => c.id === activeCategoryId);
-      parts.push(`Category: ${cat?.name || "(Unknown)"}`);
+      parts.push(t("Category: {name}", { name: cat?.name || t("(Unknown)") }));
     }
-    if (term) parts.push(`Search: "${term}"`);
+    if (term) parts.push(t('Search: "{term}"', { term }));
     const prefix = parts.length ? `${parts.join(" • ")} — ` : "";
 
     if (total === 0) {
-      els.txPageInfo.textContent = parts.length ? `${prefix}No records.` : "";
+      els.txPageInfo.textContent = parts.length ? `${prefix}${t("No records.")}` : "";
     } else {
       const start = (txPage - 1) * TX_PAGE_SIZE + 1;
       const end = Math.min(txPage * TX_PAGE_SIZE, total);
-      els.txPageInfo.textContent = `${prefix}Showing ${start}-${end} of ${total} (Page ${txPage}/${totalPages})`;
+      els.txPageInfo.textContent = prefix + t("Showing {start}-{end} of {total} (Page {page}/{pages})", { start, end, total, page: txPage, pages: totalPages });
     }
   }
 
   if (total === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="6" class="muted">No records found.</td>`;
+    tr.innerHTML = `<td colspan="6" class="muted">${t("No records found.")}</td>`;
     els.txTbody.appendChild(tr);
     if (tableWrap) requestAnimationFrame(() => { tableWrap.style.minHeight = ""; });
     return;
@@ -1249,7 +1250,7 @@ function renderTransactionsTable() {
 
   for (const tx of pageItems) {
     const tr = document.createElement("tr");
-    const typeLabel = tx.type === "expense" ? "Expense" : "Revenue";
+    const typeLabel = tx.type === "expense" ? t("Expense") : t("Revenue");
     const tagsHtml = Array.isArray(tx.tags) && tx.tags.length
       ? `<div class="tag-chips">${tx.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</div>`
       : "";
@@ -1261,9 +1262,9 @@ function renderTransactionsTable() {
       <td data-label="Note">${escapeHtml(tx.note || "")}${tagsHtml}</td>
       <td>
         <div class="row-actions">
-          <button class="btn btn-secondary btn-small" type="button" data-action="receipts-tx" data-id="${tx.id}" title="Photos" aria-label="Photos">${icon("paperclip", "icon-sm")}${tx.receiptCount ? " " + tx.receiptCount : ""}</button>
-          <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${tx.id}">Edit</button>
-          <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${tx.id}">Delete</button>
+          <button class="btn btn-secondary btn-small" type="button" data-action="receipts-tx" data-id="${tx.id}" title="${t("Photos")}" aria-label="${t("Photos")}">${icon("paperclip", "icon-sm")}${tx.receiptCount ? " " + tx.receiptCount : ""}</button>
+          <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${tx.id}">${t("Edit")}</button>
+          <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${tx.id}">${t("Delete")}</button>
         </div>
       </td>
     `;
@@ -1330,7 +1331,7 @@ function renderStats() {
   });
 
   if (rows.length === 0) {
-    els.statsTbody.innerHTML = `<div class="muted small">No records in this range.</div>`;
+    els.statsTbody.innerHTML = `<div class="muted small">${t("No records in this range.")}</div>`;
     return;
   }
 
@@ -1539,28 +1540,28 @@ async function setSignedInUi(user) {
 function friendlyAuthError(err) {
   const code = err?.code || "";
   const msg = String(err?.message || "").toLowerCase();
-  if (code === "auth/invalid-credential") return "Wrong email or password.";
-  if (code === "auth/user-not-found") return "No account found for this email.";
-  if (code === "auth/wrong-password") return "Wrong email or password.";
-  if (code === "auth/email-already-in-use") return "Email already in use. Try signing in.";
-  if (code === "auth/weak-password") return "Password is too weak (min 6 characters).";
-  if (code === "auth/popup-closed-by-user") return "Google sign-in popup was closed.";
-  if (code === "auth/popup-blocked") return "Google sign-in popup was blocked by the browser. Try again or use a normal browser (Chrome/Safari).";
+  if (code === "auth/invalid-credential") return t("Wrong email or password.");
+  if (code === "auth/user-not-found") return t("No account found for this email.");
+  if (code === "auth/wrong-password") return t("Wrong email or password.");
+  if (code === "auth/email-already-in-use") return t("Email already in use. Try signing in.");
+  if (code === "auth/weak-password") return t("Password is too weak (min 6 characters).");
+  if (code === "auth/popup-closed-by-user") return t("Google sign-in popup was closed.");
+  if (code === "auth/popup-blocked") return t("Google sign-in popup was blocked by the browser. Try again or use a normal browser (Chrome/Safari).");
   if (code === "auth/operation-not-supported-in-this-environment") {
-    return "Google sign-in is not supported in this browser (common in in-app browsers). Open the site in Chrome/Safari and try again.";
+    return t("Google sign-in is not supported in this browser (common in in-app browsers). Open the site in Chrome/Safari and try again.");
   }
   if (code === "auth/network-request-failed") {
-    return "Network request failed. Check your connection, disable VPN/ad blocker, and try again. On mobile, open the site in Chrome/Safari (not an in-app browser) and make sure cookies are allowed.";
+    return t("Network request failed. Check your connection, disable VPN/ad blocker, and try again. On mobile, open the site in Chrome/Safari (not an in-app browser) and make sure cookies are allowed.");
   }
   if (msg.includes("requested action is invalid")) {
-    return "Google sign-in failed in this mobile browser. Try opening the site in Chrome/Safari (not an in-app browser), and confirm your domain is added to Firebase Auth → Authorized domains.";
+    return t("Google sign-in failed in this mobile browser. Try opening the site in Chrome/Safari (not an in-app browser), and confirm your domain is added to Firebase Auth → Authorized domains.");
   }
   if (code === "auth/unauthorized-domain") {
     const host = typeof window !== "undefined" ? window.location.host : "";
-    const suffix = host ? ` Add this domain in Firebase Console → Authentication → Settings → Authorized domains: ${host}` : " Add your site domain in Firebase Console → Authentication → Settings → Authorized domains.";
-    return `This domain is not authorized in Firebase Auth.${suffix}`;
+    const suffix = host ? " " + t("Add this domain in Firebase Console → Authentication → Settings → Authorized domains: {host}", { host }) : " " + t("Add your site domain in Firebase Console → Authentication → Settings → Authorized domains.");
+    return t("This domain is not authorized in Firebase Auth.") + suffix;
   }
-  return err?.message || "Sign-in failed.";
+  return err?.message || t("Sign-in failed.");
 }
 
 async function withAuthButtonsDisabled(fn) {
@@ -1647,7 +1648,7 @@ function startCategoryEdit(id) {
   const eff = effectiveBudgetFor(c, period, budgetReferenceDateForPeriod(period));
   els.categoryBudget.value = eff ? String(eff) : "";
   els.categoryPeriod.value = period;
-  if (els.categorySubmitBtn) els.categorySubmitBtn.textContent = "Save";
+  if (els.categorySubmitBtn) els.categorySubmitBtn.textContent = t("Save");
   if (els.cancelCategoryEdit) els.cancelCategoryEdit.hidden = false;
   updateCategoryBudgetHint();
   els.categoryName.focus();
@@ -1656,7 +1657,7 @@ function startCategoryEdit(id) {
 function cancelCategoryEdit() {
   editingCategoryId = null;
   els.categoryForm.reset();
-  if (els.categorySubmitBtn) els.categorySubmitBtn.textContent = "Add category";
+  if (els.categorySubmitBtn) els.categorySubmitBtn.textContent = t("Add category");
   if (els.cancelCategoryEdit) els.cancelCategoryEdit.hidden = true;
   updateCategoryBudgetHint();
 }
@@ -1668,11 +1669,11 @@ function updateCategoryBudgetHint() {
   if (period === "month") {
     const monthValue = els.budgetMonth.value || currentMonthValue();
     els.categoryBudgetHint.textContent =
-      `Budget applies to ${monthValue}. Change “Budget month” below to set a different amount for another month.`;
+      t("Budget applies to {month}. Change “Budget month” below to set a different amount for another month.", { month: monthValue });
   } else if (period === "year") {
-    els.categoryBudgetHint.textContent = "Yearly budget applies to the whole year.";
+    els.categoryBudgetHint.textContent = t("Yearly budget applies to the whole year.");
   } else {
-    els.categoryBudgetHint.textContent = "Lifetime budget applies across all records.";
+    els.categoryBudgetHint.textContent = t("Lifetime budget applies across all records.");
   }
 }
 
@@ -1821,33 +1822,33 @@ function renderBudgetRecordsModal(category) {
   const budgetAmount = effectiveBudgetFor(category, period, referenceDate);
   const effectiveBudgetBalance = budgetAmount + balance;
   const allBudgetTransactions = getBudgetTransactions(category.id, budgetRange);
-  const recordLabel = allBudgetTransactions.length === 1 ? "1 record" : `${allBudgetTransactions.length} records`;
+  const recordLabel = allBudgetTransactions.length === 1 ? t("1 record") : t("{n} records", { n: allBudgetTransactions.length });
   const hasBudget = budgetAmount > 0;
   const summaryValue = hasBudget ? effectiveBudgetBalance : balance;
   const summaryItems = [
     {
-      label: "Budget",
-      value: hasBudget ? money(budgetAmount) : "No limit",
+      label: t("Budget"),
+      value: hasBudget ? money(budgetAmount) : t("No limit"),
       className: "",
     },
     {
-      label: "Spent",
+      label: t("Spent"),
       value: money(spent),
       className: "val-negative",
     },
     {
-      label: "Income",
+      label: t("Income"),
       value: money(income),
       className: "val-positive",
     },
     {
-      label: hasBudget ? "Balance" : "Net",
+      label: hasBudget ? t("Balance") : t("Net"),
       value: money(summaryValue),
       className: summaryValue > 0 ? "val-positive" : summaryValue < 0 ? "val-negative" : "",
     },
   ];
 
-  els.budgetRecordsTitle.textContent = `${category.name} Records`;
+  els.budgetRecordsTitle.textContent = t("{name} Records", { name: category.name });
   els.budgetRecordsMeta.textContent = `${budgetRange.periodLabel} • ${budgetRange.rangeLabel} • ${recordLabel}`;
   els.budgetRecordsSummary.innerHTML = `
     <div class="budget-card-stats">
@@ -1886,7 +1887,7 @@ function renderBudgetRecordsModal(category) {
   if (els.budgetRecordsNextBtn) els.budgetRecordsNextBtn.disabled = budgetRecordsPage >= totalPages;
   if (els.budgetRecordsPageInfo) {
     if (total === 0) {
-      const hint = term || dateFilter ? "No matching records." : "";
+      const hint = term || dateFilter ? t("No matching records.") : "";
       els.budgetRecordsPageInfo.textContent = hint;
     } else {
       const start = (budgetRecordsPage - 1) * BUDGET_RECORDS_PAGE_SIZE + 1;
@@ -1894,8 +1895,8 @@ function renderBudgetRecordsModal(category) {
       const filters = [];
       if (term) filters.push(`"${budgetRecordsSearchTerm}"`);
       if (dateFilter) filters.push(dateFilter);
-      const filterInfo = filters.length ? ` • Filter: ${filters.join(", ")}` : "";
-      els.budgetRecordsPageInfo.textContent = `Showing ${start}-${end} of ${total} (Page ${budgetRecordsPage}/${totalPages})${filterInfo}`;
+      const filterInfo = filters.length ? ` • ${t("Filter")}: ${filters.join(", ")}` : "";
+      els.budgetRecordsPageInfo.textContent = t("Showing {start}-{end} of {total} (Page {page}/{pages})", { start, end, total, page: budgetRecordsPage, pages: totalPages }) + filterInfo;
     }
   }
 
@@ -1903,7 +1904,7 @@ function renderBudgetRecordsModal(category) {
 
   if (total === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="4" class="muted">${term || dateFilter ? "No matching records." : "No records in this budget range yet."}</td>`;
+    tr.innerHTML = `<td colspan="4" class="muted">${term || dateFilter ? t("No matching records.") : t("No records in this budget range yet.")}</td>`;
     els.budgetRecordsTbody.appendChild(tr);
     return;
   }
@@ -1913,7 +1914,7 @@ function renderBudgetRecordsModal(category) {
 
   for (const tx of pageItems) {
     const tr = document.createElement("tr");
-    const typeLabel = tx.type === "expense" ? "Expense" : "Revenue";
+    const typeLabel = tx.type === "expense" ? t("Expense") : t("Revenue");
     const amountClass = tx.type === "expense" ? "val-negative" : "val-positive";
 
     tr.innerHTML = `
@@ -1998,7 +1999,7 @@ async function saveEditModal() {
 function cancelTxEdit() {
   editingTransactionId = null;
   els.txForm.reset();
-  if (els.txSubmitBtn) els.txSubmitBtn.textContent = "Record";
+  if (els.txSubmitBtn) els.txSubmitBtn.textContent = t("Record");
   if (els.cancelTxEdit) els.cancelTxEdit.hidden = true;
 }
 
@@ -2062,11 +2063,11 @@ function renderTrend(range, start, endExclusive) {
 
   const formatTrend = (cur, prev) => {
     if (prev === 0 && cur === 0) return { text: "", cls: "" };
-    if (prev === 0) return { text: "↑ new", cls: "trend-up" };
+    if (prev === 0) return { text: `↑ ${t("new")}`, cls: "trend-up" };
     const pct = ((cur - prev) / prev) * 100;
     const arrow = pct > 0 ? "↑" : pct < 0 ? "↓" : "→";
     return {
-      text: `${arrow} ${Math.abs(pct).toFixed(0)}% vs prev`,
+      text: t("{arrow} {pct}% vs prev", { arrow, pct: Math.abs(pct).toFixed(0) }),
       cls: pct > 0 ? "trend-up" : pct < 0 ? "trend-down" : "",
     };
   };
@@ -2113,7 +2114,7 @@ function renderProjection(range, start, endExclusive) {
 
   if (els.dailyAvgExpense) els.dailyAvgExpense.textContent = money(dailyAvg);
   if (els.projectedExpense) els.projectedExpense.textContent = `~${money(projected)}`;
-  if (els.daysLeft) els.daysLeft.textContent = `${remaining} days`;
+  if (els.daysLeft) els.daysLeft.textContent = t("{n} days", { n: remaining });
 }
 
 /* =============================================
@@ -2544,8 +2545,8 @@ function findCategoryByNlp(catName) {
 }
 
 async function executeAssistantIntent(parsed) {
-  if (!uid) return { ok: false, message: "Please sign in first." };
-  if (!parsed) return { ok: false, message: "I didn't understand that. Try again?" };
+  if (!uid) return { ok: false, message: t("Please sign in first.") };
+  if (!parsed) return { ok: false, message: t("I didn't understand that. Try again?") };
 
   const intent = parsed.intent;
 
@@ -2554,16 +2555,16 @@ async function executeAssistantIntent(parsed) {
     const result = queryTransactions(parsed);
     let label = "";
     if (intent === "query_category") {
-      label = `${parsed.category || "all"} spending`;
+      label = t("{category} spending", { category: parsed.category || t("all") });
     } else if (intent === "query_item") {
-      label = `"${parsed.item_name}" spending`;
+      label = t('"{item}" spending', { item: parsed.item_name });
     } else {
-      label = "total";
+      label = t("total");
     }
     return {
       ok: true,
       type: "query",
-      message: `${label} for ${result.monthLabel}`,
+      message: t("{label} for {month}", { label, month: result.monthLabel }),
       expense: result.totalExpense,
       revenue: result.totalRevenue,
       net: result.net,
@@ -2574,13 +2575,13 @@ async function executeAssistantIntent(parsed) {
   // --- Add expense / income ---
   if (intent === "add_expense" || intent === "add_income") {
     if (!parsed.amount || parsed.amount <= 0) {
-      return { ok: false, message: "I couldn't detect the amount. Please include a number." };
+      return { ok: false, message: t("I couldn't detect the amount. Please include a number.") };
     }
 
     const type = intent === "add_income" ? "revenue" : "expense";
     const cat = findCategoryByNlp(parsed.category);
     if (!cat && categories.length === 0) {
-      return { ok: false, message: "No categories yet. Please add a category first." };
+      return { ok: false, message: t("No categories yet. Please add a category first.") };
     }
 
     const categoryId = cat ? cat.id : categories[0].id;
@@ -2602,16 +2603,16 @@ async function executeAssistantIntent(parsed) {
 
     lastUsedCategoryId = categoryId;
 
-    const typeLabel = type === "expense" ? "Expense" : "Income";
+    const typeLabel = type === "expense" ? t("Expense") : t("Income");
     return {
       ok: true,
       type: "add",
-      message: `${typeLabel} recorded!`,
+      message: t("{type} recorded!", { type: typeLabel }),
       detail: `${categoryName} · ${money(parsed.amount)} · ${dateISO}${note ? " · " + note : ""}`,
     };
   }
 
-  return { ok: false, message: "I'm not sure what to do. Try saying something like '今天吃鸡饭18块' or 'spent 50 on fuel'." };
+  return { ok: false, message: t("I'm not sure what to do. Try saying something like '今天吃鸡饭18块' or 'spent 50 on fuel'.") };
 }
 
 // --- Chat UI helpers ---
@@ -2628,7 +2629,7 @@ function addThinking() {
   if (!els.assistantChat) return null;
   const div = document.createElement("div");
   div.className = "chat-thinking";
-  div.textContent = "Thinking...";
+  div.textContent = t("Thinking...");
   els.assistantChat.appendChild(div);
   els.assistantChat.scrollTop = els.assistantChat.scrollHeight;
   return div;
@@ -2636,11 +2637,11 @@ function addThinking() {
 
 function formatQueryResult(result) {
   let html = `<span>${icon("chart", "icon-sm")} ${escapeHtml(result.message)}</span>`;
-  html += `<span class="chat-amount">${money(result.expense)} expense</span>`;
+  html += `<span class="chat-amount">${t("{amount} expense", { amount: money(result.expense) })}</span>`;
   if (result.revenue > 0) {
-    html += `<span class="chat-detail">Revenue: ${money(result.revenue)} · Net: ${money(result.net)}</span>`;
+    html += `<span class="chat-detail">${t("Revenue: {revenue} · Net: {net}", { revenue: money(result.revenue), net: money(result.net) })}</span>`;
   }
-  html += `<span class="chat-detail">${result.count} record(s) found</span>`;
+  html += `<span class="chat-detail">${t("{n} record(s) found", { n: result.count })}</span>`;
   return html;
 }
 
@@ -2651,7 +2652,7 @@ function formatAddResult(result) {
 }
 
 function formatBatchAddResult(results, errors) {
-  let html = `<span class="chat-success">${icon("check", "icon-sm")} ${results.length} transaction(s) recorded!</span>`;
+  let html = `<span class="chat-success">${icon("check", "icon-sm")} ${t("{n} transaction(s) recorded!", { n: results.length })}</span>`;
   
   // Show each transaction
   for (const r of results) {
@@ -2660,7 +2661,7 @@ function formatBatchAddResult(results, errors) {
   
   // Show any errors
   if (errors && errors.length > 0) {
-    html += `<span class="chat-detail" style="color:var(--warning);">${icon("warn", "icon-sm")} ${errors.length} failed: ${escapeHtml(errors[0])}</span>`;
+    html += `<span class="chat-detail" style="color:var(--warning);">${icon("warn", "icon-sm")} ${t("{n} failed: {error}", { n: errors.length, error: escapeHtml(errors[0]) })}</span>`;
   }
   
   return html;
@@ -2742,7 +2743,7 @@ async function handleAssistantMessage(text) {
     }
   } catch (err) {
     if (thinking) thinking.remove();
-    addChatBubble("bot", `<span>${icon("x-circle", "icon-sm")} Error: ${escapeHtml(friendlyDbError(err))}</span>`);
+    addChatBubble("bot", `<span>${icon("x-circle", "icon-sm")} ${t("Error: {message}", { message: escapeHtml(friendlyDbError(err)) })}</span>`);
   }
 }
 
@@ -2770,9 +2771,9 @@ function initSpeechRecognition() {
   rec.onerror = (event) => {
     stopListening();
     if (event.error === "no-speech") {
-      addChatBubble("bot", `<span>${icon("mic", "icon-sm")} No speech detected. Please try again.</span>`);
+      addChatBubble("bot", `<span>${icon("mic", "icon-sm")} ${t("No speech detected. Please try again.")}</span>`);
     } else if (event.error === "not-allowed") {
-      addChatBubble("bot", `<span>${icon("mic", "icon-sm")} Microphone access denied. Please allow mic permission.</span>`);
+      addChatBubble("bot", `<span>${icon("mic", "icon-sm")} ${t("Microphone access denied. Please allow mic permission.")}</span>`);
     }
   };
 
@@ -2788,7 +2789,7 @@ function startListening() {
     speechRecognition = initSpeechRecognition();
   }
   if (!speechRecognition) {
-    addChatBubble("bot", `<span>${icon("mic", "icon-sm")} Speech recognition not supported in this browser. Use Chrome for best results.</span>`);
+    addChatBubble("bot", `<span>${icon("mic", "icon-sm")} ${t("Speech recognition not supported in this browser. Use Chrome for best results.")}</span>`);
     return;
   }
   try {
@@ -2967,7 +2968,7 @@ function updateAutoCategorySuggestion() {
     return;
   }
 
-  els.autoCategorySuggestion.innerHTML = `${icon("bulb", "icon-sm")} Suggest: ${escapeHtml(suggestion.name)} (${Math.round(suggestion.confidence * 100)}% match — click to apply)`;
+  els.autoCategorySuggestion.innerHTML = `${icon("bulb", "icon-sm")} ${t("Suggest: {name} ({pct}% match — click to apply)", { name: escapeHtml(suggestion.name), pct: Math.round(suggestion.confidence * 100) })}`;
   els.autoCategorySuggestion.hidden = false;
   els.autoCategorySuggestion.onclick = () => {
     els.txCategory.value = suggestion.id;
@@ -2979,7 +2980,7 @@ function updateAutoCategorySuggestion() {
 function generateInsights() {
   if (!els.insightsContent) return;
   if (transactions.length === 0) {
-    els.insightsContent.innerHTML = '<div class="muted">Add some records to see insights.</div>';
+    els.insightsContent.innerHTML = `<div class="muted">${t("Add some records to see insights.")}</div>`;
     return;
   }
 
@@ -3013,24 +3014,24 @@ function generateInsights() {
   const dayOfMonth = now.getDate();
   const dailyAvg = dayOfMonth > 0 ? curExpense / dayOfMonth : 0;
   const projected = dailyAvg * daysInMonth;
-  const monthName = now.toLocaleDateString(undefined, { month: "long" });
+  const monthName = now.toLocaleDateString(locale(), { month: "long" });
 
   // 1. Friendly headline
   let heroSub, heroIcon;
   if (curExpense === 0 && curRevenue === 0) {
-    heroSub = "Nothing logged this month yet — add a record to get started!";
+    heroSub = t("Nothing logged this month yet — add a record to get started!");
     heroIcon = "edit";
   } else if (netCur >= 0) {
-    heroSub = `You're up <b class="insight-good">${money(netCur)}</b> so far — nice going!`;
+    heroSub = t("You're up {amount} so far — nice going!", { amount: `<b class="insight-good">${money(netCur)}</b>` });
     heroIcon = "up";
   } else {
-    heroSub = `You've spent <b class="insight-warn">${money(-netCur)}</b> more than you earned this month.`;
+    heroSub = t("You've spent {amount} more than you earned this month.", { amount: `<b class="insight-warn">${money(-netCur)}</b>` });
     heroIcon = "down";
   }
   cards.push(`<div class="insight-hero">
     <div class="insight-hero-emoji">${icon(heroIcon)}</div>
     <div>
-      <div class="insight-hero-title">Your ${escapeHtml(monthName)} so far</div>
+      <div class="insight-hero-title">${t("Your {month} so far", { month: escapeHtml(monthName) })}</div>
       <div class="insight-hero-sub">${heroSub}</div>
     </div>
   </div>`);
@@ -3043,13 +3044,13 @@ function generateInsights() {
 
   // 2. Overview tiles
   const projLine = (dayOfMonth < daysInMonth && curExpense > 0)
-    ? `<div class="insight-line muted small">${icon("up", "icon-sm")} On track to spend about <b>${money(projected)}</b> by month-end (≈ ${money(dailyAvg)}/day).</div>`
+    ? `<div class="insight-line muted small">${icon("up", "icon-sm")} ${t("On track to spend about {projected} by month-end (≈ {daily}/day).", { projected: `<b>${money(projected)}</b>`, daily: money(dailyAvg) })}</div>`
     : "";
   cards.push(`<div class="insight-card">
     <div class="insight-tiles">
-      <div class="insight-tile"><span class="insight-tile-label">${icon("down", "icon-sm")} Spent</span><span class="insight-tile-value insight-warn">${money(curExpense)}</span></div>
-      <div class="insight-tile"><span class="insight-tile-label">${icon("up", "icon-sm")} Earned</span><span class="insight-tile-value insight-good">${money(curRevenue)}</span></div>
-      <div class="insight-tile"><span class="insight-tile-label">${icon("gem", "icon-sm")} Net</span><span class="insight-tile-value ${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">${icon("down", "icon-sm")} ${t("Spent")}</span><span class="insight-tile-value insight-warn">${money(curExpense)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">${icon("up", "icon-sm")} ${t("Earned")}</span><span class="insight-tile-value insight-good">${money(curRevenue)}</span></div>
+      <div class="insight-tile"><span class="insight-tile-label">${icon("gem", "icon-sm")} ${t("Net")}</span><span class="insight-tile-value ${netCur >= 0 ? 'insight-good' : 'insight-warn'}">${money(netCur)}</span></div>
     </div>
     ${projLine}
   </div>`);
@@ -3061,16 +3062,16 @@ function generateInsights() {
       const up = change > 0;
       const arrow = flat ? "→" : up ? "↑" : "↓";
       const cls = flat ? "" : (up !== higherIsBad ? "insight-good" : "insight-warn");
-      const word = flat ? "about the same" : `${Math.abs(change).toFixed(0)}% ${up ? "more" : "less"}`;
+      const word = flat ? t("about the same") : t(up ? "{pct}% more" : "{pct}% less", { pct: Math.abs(change).toFixed(0) });
       return `<div class="insight-chip ${cls}"><span class="insight-chip-arrow">${arrow}</span> ${label} ${word}</div>`;
     };
     const expChange = prevExpense > 0 ? ((curExpense - prevExpense) / prevExpense * 100) : 0;
     const revChange = prevRevenue > 0 ? ((curRevenue - prevRevenue) / prevRevenue * 100) : 0;
     cards.push(`<div class="insight-card">
-      <h4>${icon("up", "icon-sm")} Compared to last month</h4>
+      <h4>${icon("up", "icon-sm")} ${t("Compared to last month")}</h4>
       <div class="insight-chips">
-        ${chip("spending", expChange, true)}
-        ${chip("income", revChange, false)}
+        ${chip(t("spending"), expChange, true)}
+        ${chip(t("income"), revChange, false)}
       </div>
     </div>`);
   }
@@ -3088,7 +3089,7 @@ function generateInsights() {
       </div>`;
     }).join("");
     cards.push(`<div class="insight-card">
-      <h4>${icon("trophy", "icon-sm")} Where your money went</h4>
+      <h4>${icon("trophy", "icon-sm")} ${t("Where your money went")}</h4>
       <div class="insight-bars">${bars}</div>
     </div>`);
   }
@@ -3107,14 +3108,14 @@ function generateInsights() {
   if (budgetAlerts.length > 0) {
     const rows = budgetAlerts.map((a) => {
       const over = a.pct > 100;
-      const badge = over ? `${icon("warn", "icon-sm")} Over by ${money(a.spent - a.budget)}` : a.pct >= 100 ? `${icon("check", "icon-sm")} Fully used` : `${icon("zap", "icon-sm")} ${a.pct.toFixed(0)}%`;
+      const badge = over ? `${icon("warn", "icon-sm")} ${t("Over by {amount}", { amount: money(a.spent - a.budget) })}` : a.pct >= 100 ? `${icon("check", "icon-sm")} ${t("Fully used")}` : `${icon("zap", "icon-sm")} ${a.pct.toFixed(0)}%`;
       return `<div class="insight-bar-row">
         <div class="insight-bar-head"><span>${escapeHtml(a.name)}</span><span class="${over ? 'insight-warn' : 'insight-highlight'}">${badge}</span></div>
         <div class="insight-bar-track"><div class="insight-bar-fill ${over ? 'over' : ''}" style="width:${Math.min(100, a.pct)}%"></div></div>
       </div>`;
     }).join("");
     cards.push(`<div class="insight-card">
-      <h4>${icon("warn", "icon-sm")} Budgets to watch</h4>
+      <h4>${icon("warn", "icon-sm")} ${t("Budgets to watch")}</h4>
       <div class="insight-bars">${rows}</div>
     </div>`);
   }
@@ -3134,8 +3135,8 @@ function generateInsights() {
     const weAvg = weekend.total / weekend.count;
     const moreWeekend = weAvg > wdAvg;
     cards.push(`<div class="insight-card">
-      <h4>${icon("calendar", "icon-sm")} Your habit</h4>
-      <div class="insight-line">You spend more on <strong>${moreWeekend ? "weekends" : "weekdays"}</strong> — about <b class="insight-highlight">${money(moreWeekend ? weAvg : wdAvg)}</b> per transaction vs ${money(moreWeekend ? wdAvg : weAvg)}.</div>
+      <h4>${icon("calendar", "icon-sm")} ${t("Your habit")}</h4>
+      <div class="insight-line">${t("You spend more on {days} — about {avg} per transaction vs {other}.", { days: `<strong>${t(moreWeekend ? "weekends" : "weekdays")}</strong>`, avg: `<b class="insight-highlight">${money(moreWeekend ? weAvg : wdAvg)}</b>`, other: money(moreWeekend ? wdAvg : weAvg) })}</div>
     </div>`);
   }
 
@@ -3150,7 +3151,7 @@ let receiptExtractedText = "";
 
 async function ensureTesseract() {
   if (TesseractWorker) return TesseractWorker;
-  if (els.receiptStatus) els.receiptStatus.textContent = "Loading OCR engine…";
+  if (els.receiptStatus) els.receiptStatus.textContent = t("Loading OCR engine…");
 
   // Load Tesseract.js via script tag if not already loaded
   if (!globalThis.Tesseract) {
@@ -3203,9 +3204,9 @@ async function startReceiptCamera() {
     els.receiptVideo.srcObject = receiptStream;
     els.receiptVideo.hidden = false;
     els.receiptCaptureBtn.hidden = false;
-    if (els.receiptStatus) els.receiptStatus.textContent = "Point camera at receipt and tap Capture.";
+    if (els.receiptStatus) els.receiptStatus.textContent = t("Point camera at receipt and tap Capture.");
   } catch (err) {
-    if (els.receiptStatus) els.receiptStatus.textContent = "Camera not available. Try uploading an image instead.";
+    if (els.receiptStatus) els.receiptStatus.textContent = t("Camera not available. Try uploading an image instead.");
   }
 }
 
@@ -3222,7 +3223,7 @@ function captureFromVideo() {
 }
 
 async function processReceiptImage(imageSource) {
-  if (els.receiptStatus) els.receiptStatus.textContent = "Analyzing receipt…";
+  if (els.receiptStatus) els.receiptStatus.textContent = t("Analyzing receipt…");
   if (els.receiptResult) els.receiptResult.hidden = true;
 
   try {
@@ -3257,12 +3258,12 @@ async function processReceiptImage(imageSource) {
     const noteLines = lines.filter((l) => !/^\d+[.,]\d{2}$/.test(l)).slice(0, 3);
     receiptExtractedText = noteLines.join(" ").substring(0, 80);
 
-    if (els.receiptAmountResult) els.receiptAmountResult.textContent = bestAmount != null ? money(bestAmount) : "Not detected";
-    if (els.receiptTextResult) els.receiptTextResult.textContent = receiptExtractedText || "Not detected";
+    if (els.receiptAmountResult) els.receiptAmountResult.textContent = bestAmount != null ? money(bestAmount) : t("Not detected");
+    if (els.receiptTextResult) els.receiptTextResult.textContent = receiptExtractedText || t("Not detected");
     if (els.receiptResult) els.receiptResult.hidden = false;
-    if (els.receiptStatus) els.receiptStatus.textContent = "Done! Review the extracted data below.";
+    if (els.receiptStatus) els.receiptStatus.textContent = t("Done! Review the extracted data below.");
   } catch (err) {
-    if (els.receiptStatus) els.receiptStatus.textContent = "OCR failed: " + (err.message || "Unknown error");
+    if (els.receiptStatus) els.receiptStatus.textContent = t("OCR failed: {message}", { message: err.message || t("Unknown error") });
   }
 }
 
@@ -3333,12 +3334,12 @@ function renderDashboard() {
   }
   if (allocNote) {
     if (revenue <= 0) {
-      allocNote.textContent = "No income recorded this month yet.";
+      allocNote.textContent = t("No income recorded this month yet.");
     } else if (remaining < 0) {
-      allocNote.textContent = `Over-allocated by ${money(-remaining)} — your monthly budgets exceed this month's income.`;
+      allocNote.textContent = t("Over-allocated by {amount} — your monthly budgets exceed this month's income.", { amount: money(-remaining) });
     } else {
       const pctBudgeted = Math.round((budgetedMonthly / revenue) * 100);
-      allocNote.textContent = `${pctBudgeted}% of income budgeted — ${money(remaining)} still unallocated.`;
+      allocNote.textContent = t("{pct}% of income budgeted — {amount} still unallocated.", { pct: pctBudgeted, amount: money(remaining) });
     }
   }
 
@@ -3347,7 +3348,7 @@ function renderDashboard() {
   if (dashRecent) {
     const recent = transactions.slice(0, 5);
     if (recent.length === 0) {
-      dashRecent.innerHTML = '<div class="muted small">No recent transactions.</div>';
+      dashRecent.innerHTML = `<div class="muted small">${t("No recent transactions.")}</div>`;
     } else {
       dashRecent.innerHTML = recent.map((tx) => {
         const cls = tx.type === "expense" ? "expense" : "revenue";
@@ -3384,16 +3385,16 @@ function renderDashboard() {
 
       if (pct >= 80) {
         const label = pct > 100
-          ? `${icon("warn", "icon-sm")} Over by ${money(spent - budgetAmount)}`
-          : pct >= 100 ? `${icon("check", "icon-sm")} Fully used` : `${icon("zap", "icon-sm")} ${Math.round(pct)}% used`;
+          ? `${icon("warn", "icon-sm")} ${t("Over by {amount}", { amount: money(spent - budgetAmount) })}`
+          : pct >= 100 ? `${icon("check", "icon-sm")} ${t("Fully used")}` : `${icon("zap", "icon-sm")} ${t("{pct}% used", { pct: Math.round(pct) })}`;
         alerts.push(`<div class="dash-alert-item">${escapeHtml(cat.name)}: ${money(spent)} / ${money(budgetAmount)} — ${label}</div>`);
 
         // Browser notification (deduped per category + month + threshold)
         const monthKey = currentMonthValue(monthRef);
         if (pct > 100) {
-          notifyBudget("Budget exceeded", `${cat.name}: ${money(spent)} / ${money(budgetAmount)} — over by ${money(spent - budgetAmount)}`, `${cat.id}:${monthKey}:over`);
+          notifyBudget(t("Budget exceeded"), t("{name}: {spent} / {budget} — over by {over}", { name: cat.name, spent: money(spent), budget: money(budgetAmount), over: money(spent - budgetAmount) }), `${cat.id}:${monthKey}:over`);
         } else {
-          notifyBudget("Budget warning", `${cat.name}: ${Math.round(pct)}% of budget used (${money(spent)} / ${money(budgetAmount)})`, `${cat.id}:${monthKey}:80`);
+          notifyBudget(t("Budget warning"), t("{name}: {pct}% of budget used ({spent} / {budget})", { name: cat.name, pct: Math.round(pct), spent: money(spent), budget: money(budgetAmount) }), `${cat.id}:${monthKey}:80`);
         }
       }
 
@@ -3403,16 +3404,16 @@ function renderDashboard() {
         const projected = dailyRate * daysInMonth;
         if (projected > budgetAmount) {
           const crossDay = Math.ceil(budgetAmount / dailyRate);
-          const dayText = crossDay <= daysInMonth ? `around day ${crossDay}` : "after month-end";
+          const dayText = crossDay <= daysInMonth ? t("around day {day}", { day: crossDay }) : t("after month-end");
           forecasts.push(
-            `<div class="dash-alert-item dash-forecast-item">${icon("activity", "icon-sm")} ${escapeHtml(cat.name)}: at this rate you'll spend ~${money(projected)} (budget ${money(budgetAmount)}) — likely exceed ${dayText}.</div>`
+            `<div class="dash-alert-item dash-forecast-item">${icon("activity", "icon-sm")} ${t("{name}: at this rate you'll spend ~{projected} (budget {budget}) — likely exceed {when}.", { name: escapeHtml(cat.name), projected: money(projected), budget: money(budgetAmount), when: dayText })}</div>`
           );
         }
       }
     }
 
     const html = [...alerts, ...forecasts];
-    dashAlerts.innerHTML = html.length > 0 ? html.join("") : `<div class="muted small">${icon("check", "icon-sm")} All budgets are on track.</div>`;
+    dashAlerts.innerHTML = html.length > 0 ? html.join("") : `<div class="muted small">${icon("check", "icon-sm")} ${t("All budgets are on track.")}</div>`;
   }
 
   renderUpcoming();
@@ -3456,7 +3457,7 @@ function renderMonthComparison() {
   const prev = agg(lastMonth);
 
   if (!cur.expense && !cur.income && !prev.expense && !prev.income) {
-    summary.innerHTML = '<div class="muted small">Not enough data to compare yet.</div>';
+    summary.innerHTML = `<div class="muted small">${t("Not enough data to compare yet.")}</div>`;
     if (catsEl) catsEl.innerHTML = "";
     return;
   }
@@ -3472,14 +3473,14 @@ function renderMonthComparison() {
     const sign = diff > 0 ? "+" : "";
     return `<div class="mom-row">
       <span class="mom-label">${label}</span>
-      <span class="mom-vals">${money(curVal)} <span class="muted small">vs ${money(prevVal)}</span></span>
+      <span class="mom-vals">${money(curVal)} <span class="muted small">${t("vs")} ${money(prevVal)}</span></span>
       <span class="mom-delta ${cls}">${arrow} ${sign}${money(diff)}${prevVal > 0 ? ` (${sign}${pct}%)` : ""}</span>
     </div>`;
   };
 
   summary.innerHTML =
-    deltaRow("Expense", cur.expense, prev.expense, true) +
-    deltaRow("Income", cur.income, prev.income, false);
+    deltaRow(t("Expense"), cur.expense, prev.expense, true) +
+    deltaRow(t("Income"), cur.income, prev.income, false);
 
   // Biggest per-category expense changes
   const catIds = new Set([...Object.keys(cur.byCat), ...Object.keys(prev.byCat)]);
@@ -3490,16 +3491,16 @@ function renderMonthComparison() {
     const diff = c - p;
     if (diff === 0) continue;
     const cat = categories.find((x) => x.id === id);
-    changes.push({ name: cat ? cat.name : "Uncategorized", p, diff });
+    changes.push({ name: cat ? cat.name : t("Uncategorized"), p, diff });
   }
   changes.sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
   const top = changes.slice(0, 4);
 
   if (catsEl) {
     if (!top.length) {
-      catsEl.innerHTML = '<div class="muted small">No category changes vs last month.</div>';
+      catsEl.innerHTML = `<div class="muted small">${t("No category changes vs last month.")}</div>`;
     } else {
-      catsEl.innerHTML = '<div class="mom-cat-title muted small">Biggest category changes</div>' + top.map((x) => {
+      catsEl.innerHTML = `<div class="mom-cat-title muted small">${t("Biggest category changes")}</div>` + top.map((x) => {
         const up = x.diff > 0;
         const arrow = up ? "↑" : "↓";
         const cls = up ? "expense" : "revenue";
@@ -3568,7 +3569,7 @@ function trendCategoryOptions(months) {
 
   const options = categories.map((c) => ({ id: c.id, name: c.name, total: totals.get(c.id) || 0 }));
   if (totals.has(TREND_UNCATEGORIZED)) {
-    options.push({ id: TREND_UNCATEGORIZED, name: "Uncategorized", total: totals.get(TREND_UNCATEGORIZED) });
+    options.push({ id: TREND_UNCATEGORIZED, name: t("Uncategorized"), total: totals.get(TREND_UNCATEGORIZED) });
   }
   options.sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
   return options;
@@ -3624,12 +3625,12 @@ async function renderTrendChart() {
 
   if (!options.length) {
     renderTrendCategoryPicker(options, []);
-    showMessage("Add a category to see trends.");
+    showMessage(t("Add a category to see trends."));
     return;
   }
   if (!options.some((o) => o.total > 0)) {
     renderTrendCategoryPicker(options, []);
-    showMessage("No expenses in the last 6 months.");
+    showMessage(t("No expenses in the last 6 months."));
     return;
   }
 
@@ -3637,7 +3638,7 @@ async function renderTrendChart() {
   renderTrendCategoryPicker(options, selected);
 
   if (!selected.length) {
-    showMessage("Select at least one category to see its trend.");
+    showMessage(t("Select at least one category to see its trend."));
     return;
   }
 
@@ -3654,7 +3655,7 @@ async function renderTrendChart() {
       }, 0));
       const color = categoryColor(catId);
       return {
-        label: nameById.get(catId) || "(Unknown)",
+        label: nameById.get(catId) || t("(Unknown)"),
         data,
         borderColor: color,
         backgroundColor: color,
@@ -3680,7 +3681,7 @@ async function renderTrendChart() {
     if (msgEl) msgEl.hidden = true;
     canvas.style.visibility = "visible";
   } catch (err) {
-    showMessage("Chart unavailable.");
+    showMessage(t("Chart unavailable."));
   }
 }
 
@@ -3703,7 +3704,7 @@ async function renderCashflowChart() {
   if (!canvas) return;
 
   if (transactions.length === 0) {
-    if (msgEl) { msgEl.textContent = "No data yet."; msgEl.hidden = false; }
+    if (msgEl) { msgEl.textContent = t("No data yet."); msgEl.hidden = false; }
     canvas.style.visibility = "hidden";
     return;
   }
@@ -3730,8 +3731,8 @@ async function renderCashflowChart() {
       data: {
         labels: months,
         datasets: [
-          { label: "Income", data: income, backgroundColor: "#22c55eaa", borderColor: "#22c55e", borderWidth: 1 },
-          { label: "Expense", data: expense, backgroundColor: "#e54360aa", borderColor: "#e54360", borderWidth: 1 },
+          { label: t("Income"), data: income, backgroundColor: "#22c55eaa", borderColor: "#22c55e", borderWidth: 1 },
+          { label: t("Expense"), data: expense, backgroundColor: "#e54360aa", borderColor: "#e54360", borderWidth: 1 },
         ],
       },
       options: {
@@ -3747,7 +3748,7 @@ async function renderCashflowChart() {
     if (msgEl) msgEl.hidden = true;
     canvas.style.visibility = "visible";
   } catch (err) {
-    if (msgEl) { msgEl.textContent = "Chart unavailable."; msgEl.hidden = false; }
+    if (msgEl) { msgEl.textContent = t("Chart unavailable."); msgEl.hidden = false; }
   }
 }
 
@@ -3773,7 +3774,7 @@ function renderHeatmapCalendar() {
     if (v > maxSpend) maxSpend = v;
   }
 
-  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const dayNames = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => t(d));
   let html = dayNames.map((d) => `<div class="heatmap-dayname">${d}</div>`).join("");
 
   const firstWeekday = (new Date(year, month, 1).getDay() + 6) % 7;
@@ -3785,7 +3786,7 @@ function renderHeatmapCalendar() {
     let level = 0;
     if (spend > 0) level = intensity > 0.66 ? 3 : intensity > 0.33 ? 2 : 1;
     const dateISO = `${monthKey}-${String(day).padStart(2, "0")}`;
-    const title = spend > 0 ? `${dateISO}: ${money(spend)} — tap for details` : `${dateISO} — tap for details`;
+    const title = spend > 0 ? t("{date}: {amount} — tap for details", { date: dateISO, amount: money(spend) }) : t("{date} — tap for details", { date: dateISO });
     html += `<div class="heatmap-cell heatmap-l${level} heatmap-clickable" data-date="${dateISO}" title="${escapeHtml(title)}"><span class="heatmap-daynum">${day}</span></div>`;
   }
 
@@ -3809,13 +3810,13 @@ function openDayDetail(dateISO) {
   if (title) title.innerHTML = `${icon("calendar")} ${escapeHtml(dateISO)}`;
   if (summary) {
     summary.innerHTML = `
-      <span class="day-detail-stat"><span class="muted small">Expense</span><b class="mom-delta expense">${money(expense)}</b></span>
-      <span class="day-detail-stat"><span class="muted small">Income</span><b class="mom-delta revenue">${money(income)}</b></span>
-      <span class="day-detail-stat"><span class="muted small">Net</span><b>${money(income - expense)}</b></span>`;
+      <span class="day-detail-stat"><span class="muted small">${t("Expense")}</span><b class="mom-delta expense">${money(expense)}</b></span>
+      <span class="day-detail-stat"><span class="muted small">${t("Income")}</span><b class="mom-delta revenue">${money(income)}</b></span>
+      <span class="day-detail-stat"><span class="muted small">${t("Net")}</span><b>${money(income - expense)}</b></span>`;
   }
   if (list) {
     if (!dayTxs.length) {
-      list.innerHTML = '<div class="muted small">No transactions on this day.</div>';
+      list.innerHTML = `<div class="muted small">${t("No transactions on this day.")}</div>`;
     } else {
       list.innerHTML = dayTxs.map((t) => {
         const exp = t.type === "expense";
@@ -3847,7 +3848,7 @@ function notifyBudget(title, body, key) {
 
 async function toggleBudgetAlerts() {
   if (typeof Notification === "undefined") {
-    if (els.budgetAlertsStatus) els.budgetAlertsStatus.textContent = "Notifications not supported on this device.";
+    if (els.budgetAlertsStatus) els.budgetAlertsStatus.textContent = t("Notifications not supported on this device.");
     return;
   }
   if (!budgetAlertsEnabled) {
@@ -3856,7 +3857,7 @@ async function toggleBudgetAlerts() {
       budgetAlertsEnabled = true;
       localStorage.setItem("accountBook.budgetAlerts", "on");
     } else {
-      if (els.budgetAlertsStatus) els.budgetAlertsStatus.textContent = "Permission denied. Enable notifications in your browser settings.";
+      if (els.budgetAlertsStatus) els.budgetAlertsStatus.textContent = t("Permission denied. Enable notifications in your browser settings.");
       return;
     }
   } else {
@@ -3868,10 +3869,10 @@ async function toggleBudgetAlerts() {
 
 function updateBudgetAlertsUi() {
   if (els.toggleBudgetAlertsBtn) {
-    els.toggleBudgetAlertsBtn.textContent = budgetAlertsEnabled ? "Disable Budget Alerts" : "Enable Budget Alerts";
+    els.toggleBudgetAlertsBtn.textContent = budgetAlertsEnabled ? t("Disable Budget Alerts") : t("Enable Budget Alerts");
   }
   if (els.budgetAlertsStatus) {
-    els.budgetAlertsStatus.textContent = budgetAlertsEnabled ? "On — you'll be alerted at 80% and over budget." : "Off";
+    els.budgetAlertsStatus.textContent = budgetAlertsEnabled ? t("On — you'll be alerted at 80% and over budget.") : t("Off");
   }
 }
 
@@ -3925,16 +3926,16 @@ async function importDataFromJson(file) {
   if (!file) return;
 
   try {
-    if (statusEl) statusEl.textContent = "Reading file…";
+    if (statusEl) statusEl.textContent = t("Reading file…");
     const text = await file.text();
     const data = JSON.parse(text);
 
     if (!data.categories || !data.transactions) {
-      if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} Invalid backup file format.`;
+      if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} ${t("Invalid backup file format.")}`;
       return;
     }
 
-    if (statusEl) statusEl.textContent = "Importing…";
+    if (statusEl) statusEl.textContent = t("Importing…");
 
     const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, targets: targetsCol, recurring: recCol, settings: settingsCol, debts: debtsCol, subscriptions: subsCol } = userCollections(uid);
 
@@ -4028,9 +4029,9 @@ async function importDataFromJson(file) {
       await setDoc(doc(settingsCol, "preferences"), { currencySymbol: data.settings.currencySymbol }, { merge: true });
     }
 
-    if (statusEl) statusEl.innerHTML = `${icon("check", "icon-sm")} Imported ${catCount} categories, ${txCount} transactions, ${goalCount} goals, ${recCount} recurring rules, ${debtCount} debts, ${subCount} subscriptions.`;
+    if (statusEl) statusEl.innerHTML = `${icon("check", "icon-sm")} ${t("Imported {categories} categories, {transactions} transactions, {goals} goals, {recurring} recurring rules, {debts} debts, {subscriptions} subscriptions.", { categories: catCount, transactions: txCount, goals: goalCount, recurring: recCount, debts: debtCount, subscriptions: subCount })}`;
   } catch (err) {
-    if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} Import failed: ${escapeHtml(err.message || "Unknown error")}`;
+    if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} ${t("Import failed: {message}", { message: escapeHtml(err.message || t("Unknown error")) })}`;
   }
 }
 
@@ -4042,7 +4043,7 @@ async function generatePdfReport() {
 
   const monthTxs = transactions.filter((t) => t.dateISO && t.dateISO.substring(0, 7) === month);
   if (monthTxs.length === 0) {
-    setAppError("No transactions found for " + month);
+    setAppError(t("No transactions found for {month}", { month }));
     return;
   }
 
@@ -4054,10 +4055,10 @@ async function generatePdfReport() {
 
   // Generate printable HTML
   const rows = monthTxs.map((tx) =>
-    `<tr><td>${escapeHtml(tx.dateISO)}</td><td>${escapeHtml(tx.categoryName || "")}</td><td>${tx.type === "expense" ? "Expense" : "Revenue"}</td><td style="text-align:right">${money(tx.amount)}</td><td>${escapeHtml(tx.note || "")}</td></tr>`
+    `<tr><td>${escapeHtml(tx.dateISO)}</td><td>${escapeHtml(tx.categoryName || "")}</td><td>${tx.type === "expense" ? t("Expense") : t("Revenue")}</td><td style="text-align:right">${money(tx.amount)}</td><td>${escapeHtml(tx.note || "")}</td></tr>`
   ).join("");
 
-  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Report ${month}</title>
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${t("Report {month}", { month })}</title>
 <style>
 body{font-family:Arial,sans-serif;margin:40px;color:#2d2640;}
 h1{font-size:22px;margin-bottom:4px;}
@@ -4070,15 +4071,15 @@ th{background:#f4f1fb;font-weight:700;}
 .summary strong{font-size:18px;}
 @media print{body{margin:20px;}}
 </style></head><body>
-<h1>💰 Account Book — Monthly Report</h1>
+<h1>💰 ${t("Account Book — Monthly Report")}</h1>
 <div class="sub">${month}</div>
 <div class="summary">
-<div>Expense: <strong style="color:#e54360">${money(totalExp)}</strong></div>
-<div>Revenue: <strong style="color:#22c55e">${money(totalRev)}</strong></div>
-<div>Net: <strong>${money(totalRev - totalExp)}</strong></div>
+<div>${t("Expense")}: <strong style="color:#e54360">${money(totalExp)}</strong></div>
+<div>${t("Revenue")}: <strong style="color:#22c55e">${money(totalRev)}</strong></div>
+<div>${t("Net")}: <strong>${money(totalRev - totalExp)}</strong></div>
 </div>
-<table><thead><tr><th>Date</th><th>Category</th><th>Type</th><th>Amount</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table>
-<div style="margin-top:20px;color:#999;font-size:11px;">Generated on ${new Date().toLocaleString()}</div>
+<table><thead><tr><th>${t("Date")}</th><th>${t("Category")}</th><th>${t("Type")}</th><th>${t("Amount")}</th><th>${t("Note")}</th></tr></thead><tbody>${rows}</tbody></table>
+<div style="margin-top:20px;color:#999;font-size:11px;">${t("Generated on {date}", { date: new Date().toLocaleString(locale()) })}</div>
 </body></html>`;
 
   const printWin = window.open("", "_blank");
@@ -4334,6 +4335,13 @@ function wireEvents() {
     });
   }
 
+  const langToggleBtn = document.getElementById("langToggleBtn");
+  if (langToggleBtn) {
+    langToggleBtn.addEventListener("click", () => {
+      applyLanguage(getLang() === "zh" ? "en" : "zh");
+    });
+  }
+
   els.signOutBtn.addEventListener("click", async () => {
     setAppError("");
     els.signOutBtn.disabled = true;
@@ -4350,7 +4358,7 @@ function wireEvents() {
     const email = normalizeText(els.authEmail.value);
     const password = String(els.authPassword.value || "");
     if (!email || !password) {
-      setAuthError("Please enter email and password.");
+      setAuthError(t("Please enter email and password."));
       return;
     }
     await withAuthButtonsDisabled(async () => {
@@ -4367,7 +4375,7 @@ function wireEvents() {
     const email = normalizeText(els.authEmail.value);
     const password = String(els.authPassword.value || "");
     if (!email || !password) {
-      setAuthError("Please enter email and password.");
+      setAuthError(t("Please enter email and password."));
       return;
     }
     await withAuthButtonsDisabled(async () => {
@@ -4419,7 +4427,7 @@ function wireEvents() {
       const id = btn.dataset.id;
       if (action === "delete-category") {
         setAppError("");
-        const ok = await showConfirmToast("Delete this category? (Transactions in this category are not deleted.)");
+        const ok = await showConfirmToast(t("Delete this category? (Transactions in this category are not deleted.)"));
         if (!ok) return;
 
         await withDisabled(btn, async () => {
@@ -4439,7 +4447,7 @@ function wireEvents() {
               const dataToRestore = stripUndefined({ ...backup });
               delete dataToRestore.id;
               showUndoToast({
-                message: `Category deleted. Undo?`,
+                message: t("Category deleted. Undo?"),
                 onUndo: async () => {
                   await setDoc(docRef, dataToRestore);
                 },
@@ -4499,7 +4507,7 @@ function wireEvents() {
     const id = btn.dataset.id;
     if (action === "delete-tx") {
       setAppError("");
-      const ok = await showConfirmToast("Delete this record?");
+      const ok = await showConfirmToast(t("Delete this record?"));
       if (!ok) return;
 
       await withDisabled(btn, async () => {
@@ -4519,7 +4527,7 @@ function wireEvents() {
             const dataToRestore = stripUndefined({ ...backup });
             delete dataToRestore.id;
             showUndoToast({
-              message: "Record deleted. Undo?",
+              message: t("Record deleted. Undo?"),
               onUndo: async () => {
                 await setDoc(docRef, dataToRestore);
               },
@@ -4849,10 +4857,10 @@ function wireEvents() {
       }
       data = applyAdvancedFilters(data);
       if (data.length === 0) {
-        setAppError("No records to export.");
+        setAppError(t("No records to export."));
         return;
       }
-      const header = "Date,Category,Type,Amount,Note";
+      const header = [t("Date"), t("Category"), t("Type"), t("Amount"), t("Note")].join(",");
       const csvRows = data.map((t) => {
         const note = String(t.note || "").replace(/"/g, '""');
         const cat = String(t.categoryName || "").replace(/"/g, '""');
@@ -4885,7 +4893,7 @@ function wireEvents() {
       const { action, id, goalId } = btn.dataset;
       try {
         if (action === "delete-goal" && id) {
-          const ok = await showConfirmToast("Delete this goal and its deposit history?");
+          const ok = await showConfirmToast(t("Delete this goal and its deposit history?"));
           if (ok) await deleteSavingsGoal(id);
         } else if (action === "open-contribute" && id) {
           openContribute(id);
@@ -5180,7 +5188,49 @@ function wireEvents() {
   });
 }
 
+/* ─── Language (EN / 中文) ─── */
+let authUserLabel = null; // remembered so the header status can be re-rendered on language switch
+
+function updateLangToggle() {
+  const btn = document.getElementById("langToggleBtn");
+  if (!btn) return;
+  const zhActive = getLang() === "zh";
+  const label = btn.querySelector(".lang-toggle-label");
+  if (label) label.textContent = zhActive ? "EN" : "中文";
+  btn.title = zhActive ? "Switch to English" : "切换到中文";
+  btn.setAttribute("aria-label", btn.title);
+}
+
+// Switches every piece of text on the page without a reload: static markup via
+// translateDom(), everything else by re-rendering it through t().
+function applyLanguage(lang) {
+  setLang(lang);
+  translateDom();
+  updateLangToggle();
+  applyTheme(document.documentElement.dataset.theme);
+  renderBudgetScopeLabel();
+  updateCategoryBudgetHint();
+  updateBudgetAlertsUi();
+  ensureStatsYearOptions();
+  if (uid) {
+    setAuthStatus(t("Signed in: {label}", { label: authUserLabel || t("Signed in") }));
+    renderAll();
+    renderDebts();
+    renderSubscriptions();
+    renderTemplates();
+    renderUpcoming();
+    generateInsights();
+    renderTrendChart();
+    renderCashflowChart();
+  } else if (authUserLabel === "") {
+    setAuthStatus(t("Signed out"));
+  }
+}
+
 async function main() {
+  initLang();
+  translateDom();
+  updateLangToggle();
   initTheme();
 
   els.txDate.value = todayISO();
@@ -5199,7 +5249,7 @@ async function main() {
   const init = await initFirebase();
   if (!init.ok) {
     setWarning(init.reason);
-    setAuthStatus("Firebase not configured");
+    setAuthStatus(t("Firebase not configured"));
     return;
   }
 
@@ -5211,22 +5261,24 @@ async function main() {
     // In-memory persistence means auth state is lost on full page reload/redirect.
     // This commonly happens in in-app browsers or when storage/cookies are blocked.
     setAuthError(
-      "This browser is blocking storage/cookies, so sign-in may not persist. Open this site in Chrome/Safari (not an in-app browser) and try again."
+      t("This browser is blocking storage/cookies, so sign-in may not persist. Open this site in Chrome/Safari (not an in-app browser) and try again.")
     );
   }
 
   setWarning("");
-  setAuthStatus("Checking session…");
+  setAuthStatus(t("Checking session…"));
 
   watchAuth(async (user) => {
     if (!user) {
-      setAuthStatus("Signed out");
+      authUserLabel = "";
+      setAuthStatus(t("Signed out"));
       setSignedOutUi();
       return;
     }
 
-    const label = user.email || user.displayName || "Signed in";
-    setAuthStatus(`Signed in: ${label}`);
+    const label = user.email || user.displayName || t("Signed in");
+    authUserLabel = label;
+    setAuthStatus(t("Signed in: {label}", { label }));
     await setSignedInUi(user);
   });
 }

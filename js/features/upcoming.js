@@ -48,6 +48,7 @@ function recordedOn(rule, dateISO, transactions) {
   );
 }
 
+import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function computeUpcoming({ subscriptions = [], debts = [], recurringRules = [], transactions = [], today, horizonDays = 14 }) {
   const horizonEnd = addDaysISO(today, horizonDays);
   const items = [];
@@ -112,18 +113,18 @@ export function computeUpcoming({ subscriptions = [], debts = [], recurringRules
 
 // Plain-language description of what kind of item a row is.
 function kindLabel(item) {
-  if (item.kind === "subscription") return "Subscription renewal";
-  if (item.kind === "debt") return "Debt";
-  if (item.kind === "recurring") return item.direction === "in" ? "Recurring income" : "Recurring bill";
-  return "Item";
+  if (item.kind === "subscription") return t("Subscription renewal");
+  if (item.kind === "debt") return t("Debt");
+  if (item.kind === "recurring") return item.direction === "in" ? t("Recurring income") : t("Recurring bill");
+  return t("Item");
 }
 
 function relativeDayText(days) {
-  if (days === 0) return "Today";
-  if (days === 1) return "Tomorrow";
-  if (days === -1) return "1 day overdue";
-  if (days < 0) return `${-days} days overdue`;
-  return `in ${days} days`;
+  if (days === 0) return t("Today");
+  if (days === 1) return t("Tomorrow");
+  if (days === -1) return t("1 day overdue");
+  if (days < 0) return t("{n} days overdue", { n: -days });
+  return t("in {n} days", { n: days });
 }
 
 // Renders the dashboard "Upcoming" section from a computeUpcoming() result.
@@ -131,23 +132,23 @@ function relativeDayText(days) {
 export function upcomingHtml(result, { money, escapeHtml, icon }) {
   const { items, totalToPay, totalToReceive, horizonDays = 14 } = result;
   if (items.length === 0) {
-    return `<div class="muted small">${icon("check", "icon-sm")} Nothing due in the next ${horizonDays} days.</div>`;
+    return `<div class="muted small">${icon("check", "icon-sm")} ${t("Nothing due in the next {n} days.", { n: horizonDays })}</div>`;
   }
 
   const totals = `<div class="debt-summary upcoming-totals">
-    <div class="debt-summary-item"><span class="debt-summary-label">To pay</span><span class="debt-summary-value expense">${money(totalToPay)}</span></div>
-    <div class="debt-summary-item"><span class="debt-summary-label">To receive</span><span class="debt-summary-value revenue">${money(totalToReceive)}</span></div>
+    <div class="debt-summary-item"><span class="debt-summary-label">${t("To pay")}</span><span class="debt-summary-value expense">${money(totalToPay)}</span></div>
+    <div class="debt-summary-item"><span class="debt-summary-label">${t("To receive")}</span><span class="debt-summary-value revenue">${money(totalToReceive)}</span></div>
   </div>`;
 
   const rows = items.map((item) => {
     const isIn = item.direction === "in";
     const amountCls = isIn ? "revenue" : "expense";
     const sign = isIn ? "+" : "-";
-    const overdueTag = item.overdue ? `<span class="upcoming-tag overdue">Overdue</span>` : "";
+    const overdueTag = item.overdue ? `<span class="upcoming-tag overdue">${t("Overdue")}</span>` : "";
     const when = relativeDayText(item.daysFromToday);
     const kind = kindLabel(item);
-    const flow = isIn ? "You receive" : "You pay";
-    return `<button type="button" class="dash-recent-item upcoming-item${item.overdue ? " overdue" : ""}" data-action="open-upcoming" data-view="${escapeHtml(item.view)}" data-id="${escapeHtml(item.id)}" title="Open in ${escapeHtml(item.view)}">
+    const flow = isIn ? t("You receive") : t("You pay");
+    return `<button type="button" class="dash-recent-item upcoming-item${item.overdue ? " overdue" : ""}" data-action="open-upcoming" data-view="${escapeHtml(item.view)}" data-id="${escapeHtml(item.id)}" title="${t("Tap to open")}">
       <span class="upcoming-when"><span class="upcoming-date">${escapeHtml(item.dateISO)}</span><span class="upcoming-relative">${escapeHtml(when)}</span></span>
       <span class="dash-tx-note"><span class="upcoming-label">${escapeHtml(item.label)}</span> <span class="upcoming-kind">${escapeHtml(kind)}</span>${overdueTag}</span>
       <span class="upcoming-amount-wrap"><span class="dash-tx-amount ${amountCls}">${sign}${money(item.amount)}</span><span class="upcoming-flow ${amountCls}">${flow}</span></span>

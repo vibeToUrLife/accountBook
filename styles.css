@@ -236,6 +236,9 @@ h1 .icon { width: 22px; height: 22px; color: var(--accent); }
 
 .header-left { display: flex; align-items: center; gap: 10px; }
 .header-right { display: flex; gap: 8px; align-items: center; }
+.lang-toggle { display: inline-flex; align-items: center; gap: 6px; }
+#todayBtn { white-space: nowrap; }
+.lang-toggle-label { font-size: 12px; font-weight: 700; letter-spacing: 0.02em; }
 .offline-pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; background: var(--warning-bg); color: var(--warning-text); border: 1px solid var(--warning-border); white-space: nowrap; }
 @media (max-width: 560px) {
   .offline-pill { padding: 3px 7px; font-size: 11px; }

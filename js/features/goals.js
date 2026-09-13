@@ -1,5 +1,6 @@
 // Savings Goals feature module. Progress comes from the goal's own
 // contributions (deposits minus withdrawals), stored on the goal document.
+import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
 export function createGoals(ctx) {
   const { money, icon, escapeHtml, todayISO, normalizeText, parsePositiveAmount, showUndoToast, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, setDoc, doc, serverTimestamp } = firestore;
@@ -28,7 +29,7 @@ export function createGoals(ctx) {
     if (!container) return;
 
     if (ctx.savingsGoals.length === 0) {
-      container.innerHTML = '<div class="muted small">No savings goals yet. Add one above!</div>';
+      container.innerHTML = `<div class="muted small">${t("No savings goals yet. Add one above!")}</div>`;
       return;
     }
 
@@ -91,7 +92,7 @@ export function createGoals(ctx) {
     const raw = readForm(form);
     draft = raw;
     const amount = parsePositiveAmount(raw.amount);
-    const error = validateContribution(goal, { amount, kind: raw.kind }, money) || (raw.dateISO ? null : "Pick a date.");
+    const error = validateContribution(goal, { amount, kind: raw.kind }, money) || (raw.dateISO ? null : t("Pick a date."));
     if (error) {
       formError = error;
       renderSavingsGoals();
@@ -113,10 +114,8 @@ export function createGoals(ctx) {
     draft = null;
     renderSavingsGoals();
 
-    const verb = entry.kind === "withdraw" ? "Withdrew" : "Added";
-    const prep = entry.kind === "withdraw" ? "from" : "to";
     showUndoToast({
-      message: `${verb} ${money(amount)} ${prep} ${goal.name || "goal"}.`,
+      message: t(entry.kind === "withdraw" ? "Withdrew {amount} from {goal}." : "Added {amount} to {goal}.", { amount: money(amount), goal: goal.name || t("goal") }),
       onUndo: async () => {
         const latest = ctx.savingsGoals.find((g) => g.id === goalId);
         if (latest) await saveContributions(goalId, withoutContribution(latest.contributions, entry.id));
@@ -132,7 +131,7 @@ export function createGoals(ctx) {
 
     await saveContributions(goalId, withoutContribution(goal.contributions, contributionId));
     showUndoToast({
-      message: `Removed ${money(entry.amount || 0)} entry from ${goal.name || "goal"}.`,
+      message: t("Removed {amount} entry from {goal}.", { amount: money(entry.amount || 0), goal: goal.name || t("goal") }),
       onUndo: async () => {
         const latest = ctx.savingsGoals.find((g) => g.id === goalId);
         if (latest) await saveContributions(goalId, withContribution(latest.contributions, entry));
@@ -244,15 +243,14 @@ export function sortedContributions(list) {
 
 // Returns an error message, or null when the entry can be saved.
 export function validateContribution(goal, { amount, kind }, money = (n) => String(n)) {
-  if (amount == null || !(amount > 0)) return "Enter an amount greater than 0.";
+  if (amount == null || !(amount > 0)) return t("Enter an amount greater than 0.");
   if (kind === "withdraw") {
     const saved = goalSaved(goal);
-    if (amount > saved) return `You can only withdraw up to ${money(saved)}.`;
+    if (amount > saved) return t("You can only withdraw up to {amount}.", { amount: money(saved) });
   }
   return null;
 }
 
-const KIND_LABEL = { deposit: "Deposit", withdraw: "Withdraw" };
 
 function contributionFormHtml(goal, state, { escapeHtml }, todayISO) {
   const draft = state.draft || {};
@@ -260,31 +258,31 @@ function contributionFormHtml(goal, state, { escapeHtml }, todayISO) {
   const dateISO = draft.dateISO || todayISO;
   const error = state.error ? `<div class="goal-form-error">${escapeHtml(state.error)}</div>` : "";
   return `<form class="goal-contrib-form" data-goal-id="${escapeHtml(goal.id)}" autocomplete="off">
-    <div class="goal-contrib-hint muted small">Deposit adds money to this goal. Withdraw takes money out. This does not change your records or budgets.</div>
+    <div class="goal-contrib-hint muted small">${t("Deposit adds money to this goal. Withdraw takes money out. This does not change your records or budgets.")}</div>
     <div class="goal-contrib-fields">
       <label class="field inline-sm">
-        <span>Type</span>
+        <span>${t("Type")}</span>
         <select name="kind">
-          <option value="deposit"${kind === "deposit" ? " selected" : ""}>Deposit</option>
-          <option value="withdraw"${kind === "withdraw" ? " selected" : ""}>Withdraw</option>
+          <option value="deposit"${kind === "deposit" ? " selected" : ""}>${t("Deposit")}</option>
+          <option value="withdraw"${kind === "withdraw" ? " selected" : ""}>${t("Withdraw")}</option>
         </select>
       </label>
       <label class="field inline-sm">
-        <span>Amount</span>
+        <span>${t("Amount")}</span>
         <input name="amount" type="number" inputmode="decimal" min="0.01" step="0.01" placeholder="0.00" required value="${escapeHtml(draft.amount ?? "")}" />
       </label>
       <label class="field inline-sm">
-        <span>Date</span>
+        <span>${t("Date")}</span>
         <input name="dateISO" type="date" required value="${escapeHtml(dateISO)}" />
       </label>
       <label class="field inline-sm">
-        <span>Note</span>
-        <input name="note" type="text" maxlength="60" placeholder="Optional, e.g. bonus" value="${escapeHtml(draft.note ?? "")}" />
+        <span>${t("Note")}</span>
+        <input name="note" type="text" maxlength="60" placeholder="${t("Optional, e.g. bonus")}" value="${escapeHtml(draft.note ?? "")}" />
       </label>
     </div>
     <div class="goal-contrib-actions">
-      <button class="btn btn-small" type="submit">Save</button>
-      <button class="btn btn-secondary btn-small" type="button" data-action="cancel-contribute" data-id="${escapeHtml(goal.id)}">Cancel</button>
+      <button class="btn btn-small" type="submit">${t("Save")}</button>
+      <button class="btn btn-secondary btn-small" type="button" data-action="cancel-contribute" data-id="${escapeHtml(goal.id)}">${t("Cancel")}</button>
     </div>
     ${error}
   </form>`;
@@ -292,19 +290,19 @@ function contributionFormHtml(goal, state, { escapeHtml }, todayISO) {
 
 function historyHtml(goal, { money, escapeHtml }) {
   const list = sortedContributions(goal.contributions);
-  if (list.length === 0) return `<div class="goal-history muted small">No deposits yet. Tap "Add money" to put money into this goal.</div>`;
+  if (list.length === 0) return `<div class="goal-history muted small">${t('No deposits yet. Tap "Add money" to put money into this goal.')}</div>`;
   const rows = list.map((c) => {
     const isWithdraw = c.kind === "withdraw";
     const cls = isWithdraw ? "expense" : "revenue";
     const sign = isWithdraw ? "-" : "+";
     const note = c.note ? ` · ${escapeHtml(c.note)}` : "";
     return `<div class="goal-history-item">
-      <span class="goal-history-meta">${escapeHtml(c.dateISO || "")} · ${KIND_LABEL[c.kind] || "Deposit"}${note}</span>
+      <span class="goal-history-meta">${escapeHtml(c.dateISO || "")} · ${t(c.kind === "withdraw" ? "Withdraw" : "Deposit")}${note}</span>
       <span class="goal-history-amount ${cls}">${sign}${money(c.amount || 0)}</span>
-      <button class="btn btn-danger btn-small" type="button" data-action="delete-contribution" data-goal-id="${escapeHtml(goal.id)}" data-id="${escapeHtml(c.id)}" title="Remove this entry from the goal">Remove</button>
+      <button class="btn btn-danger btn-small" type="button" data-action="delete-contribution" data-goal-id="${escapeHtml(goal.id)}" data-id="${escapeHtml(c.id)}" title="${t("Remove this entry from the goal")}">${t("Remove")}</button>
     </div>`;
   }).join("");
-  return `<div class="goal-history"><div class="goal-history-title">Deposit history</div>${rows}</div>`;
+  return `<div class="goal-history"><div class="goal-history-title">${t("Deposit history")}</div>${rows}</div>`;
 }
 
 // One goal card. `state` = { formOpen, historyOpen, error, draft } for this goal.
@@ -312,33 +310,33 @@ export function goalCardHtml(goal, state = {}, helpers, todayISO) {
   const { money, escapeHtml, icon } = helpers;
   const { saved, target, pct, isDone } = goalProgress(goal);
   const count = contributionsOf(goal).length;
-  const deadline = goal.deadline ? `Due: ${escapeHtml(goal.deadline)}` : "No deadline";
+  const deadline = goal.deadline ? t("Due: {date}", { date: escapeHtml(goal.deadline) }) : t("No deadline");
 
   let planLine = "";
   const needed = monthlyNeeded(goal, todayISO);
   if (needed != null && needed > 0) {
     const months = Math.max(1, monthsUntil(todayISO, goal.deadline));
-    planLine = `<div class="goal-plan muted small">Save ${money(needed)} per month to reach it by the deadline (${months} month${months === 1 ? "" : "s"} left).</div>`;
+    planLine = `<div class="goal-plan muted small">${t("Save {amount} per month to reach it by the deadline ({months} left).", { amount: money(needed), months: months === 1 ? t("1 month") : t("{n} months", { n: months }) })}</div>`;
   }
-  const doneTag = isDone ? `<span class="goal-done-tag">${icon("check", "icon-sm")} Reached</span>` : "";
+  const doneTag = isDone ? `<span class="goal-done-tag">${icon("check", "icon-sm")} ${t("Reached")}</span>` : "";
 
   return `<div class="goal-card" data-goal-id="${escapeHtml(goal.id)}">
     <div class="goal-card-header">
-      <h4>${icon("target", "icon-sm")} ${escapeHtml(goal.name || "Untitled")} ${doneTag}</h4>
+      <h4>${icon("target", "icon-sm")} ${escapeHtml(goal.name || t("Untitled"))} ${doneTag}</h4>
       <span class="goal-deadline">${deadline}</span>
     </div>
     <div class="goal-progress-bar">
       <div class="goal-progress-fill ${isDone ? "done" : ""}" style="width:${pct}%"></div>
     </div>
     <div class="goal-stats">
-      <span>Saved ${money(saved)} of ${money(target)}</span>
+      <span>${t("Saved {saved} of {target}", { saved: money(saved), target: money(target) })}</span>
       <span class="goal-pct">${pct.toFixed(1)}%</span>
     </div>
     ${planLine}
     <div class="goal-actions">
-      <button class="btn btn-small" type="button" data-action="open-contribute" data-id="${escapeHtml(goal.id)}" title="Record a deposit or withdrawal for this goal">${icon("plus", "icon-sm")} Add money</button>
-      <button class="btn btn-secondary btn-small" type="button" data-action="toggle-history" data-id="${escapeHtml(goal.id)}" aria-expanded="${state.historyOpen ? "true" : "false"}" title="Show every deposit and withdrawal">History (${count})</button>
-      <button class="btn btn-danger btn-small" type="button" data-action="delete-goal" data-id="${escapeHtml(goal.id)}" title="Delete this goal and its history">Delete goal</button>
+      <button class="btn btn-small" type="button" data-action="open-contribute" data-id="${escapeHtml(goal.id)}" title="${t("Record a deposit or withdrawal for this goal")}">${icon("plus", "icon-sm")} ${t("Add money")}</button>
+      <button class="btn btn-secondary btn-small" type="button" data-action="toggle-history" data-id="${escapeHtml(goal.id)}" aria-expanded="${state.historyOpen ? "true" : "false"}" title="${t("Show every deposit and withdrawal")}">${t("History ({n})", { n: count })}</button>
+      <button class="btn btn-danger btn-small" type="button" data-action="delete-goal" data-id="${escapeHtml(goal.id)}" title="${t("Delete this goal and its history")}">${t("Delete goal")}</button>
     </div>
     ${state.formOpen ? contributionFormHtml(goal, state, helpers, todayISO) : ""}
     ${state.historyOpen ? historyHtml(goal, helpers) : ""}
