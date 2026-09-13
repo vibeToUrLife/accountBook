@@ -28,11 +28,12 @@ import {
 
 import { createDebts } from "./js/features/debts.js";
 import { createSubscriptions } from "./js/features/subscriptions.js";
-import { createGoals } from "./js/features/goals.js";
+import { createGoals } from "./js/features/goals.js?v=2";
 import { createTargets } from "./js/features/targets.js";
 import { createTemplates } from "./js/features/templates.js";
 import { createReceipts } from "./js/features/receipts.js";
 import { createRecurring } from "./js/features/recurring.js";
+import { createUpcoming } from "./js/features/upcoming.js?v=1";
 
 const {
   collection,
@@ -784,13 +785,14 @@ const ctx = {
 // Feature modules (extracted from this file incrementally)
 const { renderDebts, addDebt, settleDebt, deleteDebt } = createDebts(ctx);
 const { renderSubscriptions, addSubscription, paySubscription, cancelSubscription, deleteSubscription } = createSubscriptions(ctx);
-const { renderSavingsGoals, addSavingsGoal, deleteSavingsGoal } = createGoals(ctx);
+const { renderSavingsGoals, addSavingsGoal, deleteSavingsGoal, openContribute, cancelContribute, toggleHistory, captureDraft, submitContribution, deleteContribution } = createGoals(ctx);
 const { renderTargets, addTarget, toggleTarget, deleteTarget, editTarget, cancelEditTarget, saveTarget, setCurrentAge, getCurrentAge } = createTargets(ctx);
 const { renderTemplates, saveCurrentAsTemplate, applyTemplate, deleteTemplate } = createTemplates(ctx);
 const receipts = createReceipts(ctx);
 const { queuePendingReceipts, removePendingAt, openReceiptViewer, closeReceiptViewer, addReceiptsFromViewer, deleteReceiptFromViewer, openLightbox, closeLightbox } = receipts;
 const recurring = createRecurring(ctx);
 const { renderRecurringRules, addRecurringRule, deleteRecurringRule, runDueRecurring } = recurring;
+const { renderUpcoming } = createUpcoming(ctx);
 
 // Advanced Record List filters
 let filters = {
@@ -1405,12 +1407,14 @@ async function startListenersForUser(userId) {
   unsubDebts = onSnapshot(query(debtsCol, orderBy("createdAt", "desc")), (snap) => {
     debts = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderDebts();
+    renderUpcoming();
   });
 
   // Listen to subscriptions
   unsubSubscriptions = onSnapshot(query(subsCol, orderBy("createdAt", "desc")), (snap) => {
     subscriptions = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     renderSubscriptions();
+    renderUpcoming();
   });
 
   // Listen to recurring rules
@@ -1418,6 +1422,7 @@ async function startListenersForUser(userId) {
     recurringRules = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
     recurring.markRecurringLoaded();
     renderRecurringRules();
+    renderUpcoming();
     recurring.autoRun();
   });
 
@@ -3410,6 +3415,7 @@ function renderDashboard() {
     dashAlerts.innerHTML = html.length > 0 ? html.join("") : `<div class="muted small">${icon("check", "icon-sm")} All budgets are on track.</div>`;
   }
 
+  renderUpcoming();
   renderHeatmapCalendar();
   renderMonthComparison();
 
@@ -4873,10 +4879,88 @@ function wireEvents() {
   }
   const goalsContainer = document.getElementById("goalsContainer");
   if (goalsContainer) {
-    goalsContainer.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-action='delete-goal']");
-      if (btn && btn.dataset.id) deleteSavingsGoal(btn.dataset.id);
+    goalsContainer.addEventListener("click", async (e) => {
+      const btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      const { action, id, goalId } = btn.dataset;
+      try {
+        if (action === "delete-goal" && id) {
+          const ok = await showConfirmToast("Delete this goal and its deposit history?");
+          if (ok) await deleteSavingsGoal(id);
+        } else if (action === "open-contribute" && id) {
+          openContribute(id);
+        } else if (action === "cancel-contribute") {
+          cancelContribute();
+        } else if (action === "toggle-history" && id) {
+          toggleHistory(id);
+        } else if (action === "delete-contribution" && id && goalId) {
+          await deleteContribution(goalId, id);
+        }
+      } catch (err) {
+        setAppError(friendlyDbError(err));
+      }
     });
+    goalsContainer.addEventListener("submit", (e) => {
+      const form = e.target.closest(".goal-contrib-form");
+      if (!form) return;
+      e.preventDefault();
+      submitContribution(form).catch((err) => setAppError(friendlyDbError(err)));
+    });
+    goalsContainer.addEventListener("input", (e) => {
+      const form = e.target.closest(".goal-contrib-form");
+      if (form) captureDraft(form);
+    });
+  }
+
+  // ── Dashboard: Upcoming rows open their own view ──
+  const dashUpcoming = document.getElementById("dashUpcoming");
+  if (dashUpcoming) {
+    dashUpcoming.addEventListener("click", (e) => {
+      const btn = e.target.closest("[data-action='open-upcoming']");
+      if (btn && btn.dataset.view) switchView(btn.dataset.view);
+    });
+  }
+
+  // ── Online / offline indicator (Firestore keeps working from its local cache) ──
+  const offlinePill = document.getElementById("offlinePill");
+  const updateOnlineStatus = () => {
+    if (offlinePill) offlinePill.hidden = navigator.onLine !== false;
+  };
+  window.addEventListener("online", updateOnlineStatus);
+  window.addEventListener("offline", updateOnlineStatus);
+  updateOnlineStatus();
+
+  // ── Help & Guide: "What's this?" links and Open buttons anywhere on the page ──
+  document.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-open-view]");
+    if (!btn) return;
+    e.preventDefault();
+    const topic = btn.dataset.helpTopic;
+    switchView(btn.dataset.openView);
+    if (topic) {
+      // Land on the matching card once the view has switched.
+      setTimeout(() => {
+        const target = document.getElementById(`help-${topic}`);
+        if (target) target.scrollIntoView({ behavior: "smooth", block: "start" });
+      }, 200);
+    }
+  });
+
+  // First-run tip on Add Record, shown until dismissed or the guide is opened.
+  const firstRunTip = document.getElementById("firstRunTip");
+  if (firstRunTip) {
+    const TIP_KEY = "accountBook.helpTipDismissed";
+    const dismissTip = () => {
+      try { localStorage.setItem(TIP_KEY, "1"); } catch { /* storage blocked */ }
+      firstRunTip.hidden = true;
+    };
+    let dismissed = false;
+    try { dismissed = localStorage.getItem(TIP_KEY) === "1"; } catch { /* storage blocked */ }
+    firstRunTip.hidden = dismissed;
+    const gotIt = document.getElementById("dismissFirstRunTip");
+    if (gotIt) gotIt.addEventListener("click", dismissTip);
+    const openGuide = firstRunTip.querySelector("[data-open-view='help']");
+    if (openGuide) openGuide.addEventListener("click", dismissTip);
   }
 
   // ── Life Targets ──

@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@600;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=11" />
+    <link rel="stylesheet" href="./styles.css?v=12" />
   </head>
   <body>
     <!-- SVG icon sprite (Lucide-style). Referenced via <svg class="icon"><use href="#i-NAME"></use></svg> -->
@@ -65,6 +65,7 @@
       <symbol id="i-activity" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></symbol>
       <symbol id="i-clipboard" viewBox="0 0 24 24"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/></symbol>
       <symbol id="i-x-circle" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></symbol>
+      <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></symbol>
     </defs></svg>
 
     <header class="app-header">
@@ -74,6 +75,7 @@
           <h1><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>Account Book</h1>
         </div>
         <div class="header-right">
+          <span id="offlinePill" class="offline-pill" role="status" aria-label="Offline" title="Offline — changes will sync when you're back online" hidden><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg><span class="offline-pill-text">Offline</span></span>
           <div id="authStatus" class="muted small">Connecting…</div>
           <button id="themeToggleBtn" class="btn btn-secondary" type="button" aria-pressed="false" title="Toggle dark mode"><svg class="icon" aria-hidden="true"><use href="#i-moon"></use></svg></button>
           <button id="signOutBtn" class="btn btn-secondary" type="button" disabled>Sign out</button>
@@ -137,6 +139,10 @@
           <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg></span>
           <span>Settings</span>
         </button>
+        <button class="sidebar-item" data-view="help" type="button">
+          <span class="sidebar-icon"><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg></span>
+          <span>Help &amp; Guide</span>
+        </button>
       </div>
     </nav>
 
@@ -199,7 +205,18 @@
         <section class="card stack view-section" data-view="record" aria-label="New record">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-plus"></use></svg>Add Record</h2>
-            <div class="muted small">Choose category, expense/revenue, amount, and note.</div>
+            <div class="muted small">Log one expense or income: pick a category, type the amount, add a note, tap Record. <button type="button" class="help-link" data-open-view="help" data-help-topic="record" title="Open the guide for this section">What's this?</button></div>
+          </div>
+
+
+          <div id="firstRunTip" class="callout callout-info help-tip" hidden>
+            <div class="row wrap help-tip-row">
+              <div class="small"><strong>New here?</strong> The guide explains what every section does and how to use it.</div>
+              <div class="row help-tip-actions">
+                <button type="button" class="btn btn-small" data-open-view="help">Open the guide</button>
+                <button id="dismissFirstRunTip" type="button" class="btn btn-secondary btn-small">Got it</button>
+              </div>
+            </div>
           </div>
 
           <div id="templateChipsWrap" class="template-chips-wrap" hidden>
@@ -270,7 +287,7 @@
         <section class="card stack view-section" data-view="records" aria-label="Record List">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>Record List</h2>
-            <div class="muted small">Browse and search your transactions.</div>
+            <div class="muted small">Every record you have added. Search, filter, edit or delete. <button type="button" class="help-link" data-open-view="help" data-help-topic="records" title="Open the guide for this section">What's this?</button></div>
           </div>
 
           <div class="row">
@@ -359,7 +376,7 @@
         <section class="card stack view-section" data-view="budget" aria-label="Categories & Budgets">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-landmark"></use></svg>Categories & Budgets</h2>
-            <div class="muted small">Add a category and set its budget.</div>
+            <div class="muted small">Create categories and set a spending limit for each. Cards show how much is left. <button type="button" class="help-link" data-open-view="help" data-help-topic="budget" title="Open the guide for this section">What's this?</button></div>
           </div>
 
           <form id="categoryForm" class="stack-compact" autocomplete="off">
@@ -424,6 +441,7 @@
 
           <div class="stats-header">
             <h2>Statistics</h2>
+            <div class="muted small stats-hint">Totals and a category breakdown for a week, month or year. <button type="button" class="help-link" data-open-view="help" data-help-topic="stats" title="Open the guide for this section">What's this?</button></div>
             <div class="stats-controls">
               <select id="statsRange" class="stats-range-select">
                 <option value="week">Weekly</option>
@@ -503,7 +521,7 @@
             <h2><svg class="icon" aria-hidden="true"><use href="#i-bulb"></use></svg>Spending Insights</h2>
             <button id="refreshInsightsBtn" class="btn btn-secondary btn-small" type="button">Refresh</button>
           </div>
-          <div class="muted small">Auto-generated summary of your spending patterns.</div>
+          <div class="muted small">Automatic observations about your spending. Tap Refresh after adding records. <button type="button" class="help-link" data-open-view="help" data-help-topic="insights" title="Open the guide for this section">What's this?</button></div>
           <div id="insightsContent" class="insights-content">
             <div class="muted">Add some records to see insights.</div>
           </div>
@@ -513,7 +531,7 @@
         <section class="card stack view-section" data-view="dashboard" aria-label="Dashboard">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg>Dashboard</h2>
-            <div class="muted small">Quick overview of your finances.</div>
+            <div class="muted small">Your month at a glance, plus what is due soon. <button type="button" class="help-link" data-open-view="help" data-help-topic="dashboard" title="Open the guide for this section">What's this?</button></div>
           </div>
           <div id="dashboardContent" class="dashboard-grid">
             <div class="dash-card">
@@ -535,6 +553,13 @@
               <div class="dash-card-icon"><svg class="icon" aria-hidden="true"><use href="#i-box"></use></svg></div>
               <div class="dash-card-label">Total Records</div>
               <div id="dashCount" class="dash-card-value">0</div>
+            </div>
+          </div>
+          <div class="dash-section">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-hourglass"></use></svg>Upcoming</h3>
+            <div class="muted small">Subscription renewals, debts and recurring items due in the next 14 days. Tap one to open it.</div>
+            <div id="dashUpcoming" class="dash-upcoming">
+              <div class="muted small">Nothing due in the next 14 days.</div>
             </div>
           </div>
           <div class="dash-section alloc-section">
@@ -601,7 +626,7 @@
         <section class="card stack view-section" data-view="goals" aria-label="Savings Goals">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg>Savings Goals</h2>
-            <div class="muted small">Set targets and track your progress.</div>
+            <div class="muted small">Save toward something specific. Add money to a goal to track progress. <button type="button" class="help-link" data-open-view="help" data-help-topic="goals" title="Open the guide for this section">What's this?</button></div>
           </div>
           <form id="goalForm" class="stack-compact" autocomplete="off">
             <div class="grid-3-budget">
@@ -632,7 +657,7 @@
         <section class="card stack view-section" data-view="targets" aria-label="Life Targets">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg>Target</h2>
-            <div class="muted small">Things you want to achieve by a certain age — a checklist timeline.</div>
+            <div class="muted small">Things you want to achieve by a certain age, as a checklist timeline. <button type="button" class="help-link" data-open-view="help" data-help-topic="targets" title="Open the guide for this section">What's this?</button></div>
           </div>
           <form id="targetForm" class="stack-compact" autocomplete="off">
             <div class="grid-3-budget">
@@ -666,7 +691,7 @@
         <section class="card stack view-section" data-view="recurring" aria-label="Recurring Transactions">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-repeat"></use></svg>Recurring Transactions</h2>
-            <div class="muted small">Auto-add monthly expenses or income.</div>
+            <div class="muted small">Bills or income that repeat every month. Added for you on the chosen day. <button type="button" class="help-link" data-open-view="help" data-help-topic="recurring" title="Open the guide for this section">What's this?</button></div>
           </div>
           <form id="recurringForm" class="stack-compact" autocomplete="off">
             <div class="grid-2">
@@ -715,7 +740,7 @@
         <section class="card stack view-section" data-view="debts" aria-label="Debts & Lending">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-card"></use></svg>Debts & Lending</h2>
-            <div class="muted small">Track who owes you and what you owe.</div>
+            <div class="muted small">Money you lent or borrowed, and when it is due. <button type="button" class="help-link" data-open-view="help" data-help-topic="debts" title="Open the guide for this section">What's this?</button></div>
           </div>
           <form id="debtForm" class="stack-compact" autocomplete="off">
             <div class="grid-2">
@@ -769,7 +794,7 @@
         <section class="card stack view-section" data-view="subscriptions" aria-label="Subscriptions">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-tv"></use></svg>Subscriptions</h2>
-            <div class="muted small">Track recurring services and pay them on renewal.</div>
+            <div class="muted small">Services you pay for regularly. Pay &amp; Record logs the expense when due. <button type="button" class="help-link" data-open-view="help" data-help-topic="subscriptions" title="Open the guide for this section">What's this?</button></div>
           </div>
           <form id="subForm" class="stack-compact" autocomplete="off">
             <div class="grid-2">
@@ -822,7 +847,7 @@
         <section class="card stack view-section" data-view="settings" aria-label="Settings">
           <div class="row">
             <h2><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>Settings</h2>
-            <div class="muted small">Configure your preferences.</div>
+            <div class="muted small">Currency, alerts, templates, backups and PDF reports. <button type="button" class="help-link" data-open-view="help" data-help-topic="settings" title="Open the guide for this section">What's this?</button></div>
           </div>
 
           <div class="stack-compact">
@@ -887,6 +912,164 @@
           </div>
         </section>
 
+
+        <!-- VIEW: Help & Guide -->
+        <section class="card stack view-section" data-view="help" aria-label="Help and guide">
+          <div class="row">
+            <h2><svg class="icon" aria-hidden="true"><use href="#i-help"></use></svg>Help &amp; Guide</h2>
+            <div class="muted small">What each part of Account Book does and how to use it.</div>
+          </div>
+
+          <div class="callout callout-info help-quickstart">
+            <strong>Quick start</strong>
+            <ol>
+              <li>Go to <button type="button" class="link-btn" data-open-view="budget">Budget</button> and create a few categories, each with a monthly limit (for example Food, Transport, Bills).</li>
+              <li>Log every expense or income in <button type="button" class="link-btn" data-open-view="record">Add Record</button>. The purple <strong>+</strong> button, or the <strong>N</strong> key on a keyboard, takes you there from anywhere.</li>
+              <li>Open <button type="button" class="link-btn" data-open-view="dashboard">Dashboard</button> to see this month at a glance and what is due soon.</li>
+            </ol>
+          </div>
+
+          <div class="help-grid">
+          <article class="help-card" id="help-record">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-edit"></use></svg>Add Record</h3>
+            <p class="help-for">Log one expense or one income.</p>
+            <ul class="help-steps">
+              <li>Pick a category, choose Expense or Revenue, type the amount, add a short note and the date, then tap <strong>Record</strong>.</li>
+              <li>Enter something often? Tap the star button to save it as a <strong>Quick Template</strong>, then add it with one tap next time.</li>
+              <li>Tap the camera button to <strong>scan a receipt</strong>: the amount is read from the photo and filled in for you.</li>
+              <li>The app warns you if you seem to be adding the same record twice.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="record">Open Add Record</button>
+          </article>
+          <article class="help-card" id="help-records">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-list"></use></svg>Record List</h3>
+            <p class="help-for">Everything you have recorded, newest first.</p>
+            <ul class="help-steps">
+              <li>Type in the search box to find records by note, category or tag.</li>
+              <li>Open <strong>Advanced filters</strong> to narrow by date range, expense or revenue, category, amount or tag.</li>
+              <li>Tap <strong>Edit</strong> to change a record, <strong>Delete</strong> to remove it (you get a few seconds to undo), or the paperclip to see its receipt photos.</li>
+              <li><strong>Export CSV</strong> downloads the records currently shown, for Excel or Google Sheets.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="records">Open Record List</button>
+          </article>
+          <article class="help-card" id="help-budget">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-landmark"></use></svg>Budget</h3>
+            <p class="help-for">Create categories and give each one a spending limit.</p>
+            <ul class="help-steps">
+              <li>Add a category (for example Food) with a budget for the month, the year, or with no time limit.</li>
+              <li>Each card shows what you spent, what came in and how much of the budget is left. It turns orange at 80% and red when you go over.</li>
+              <li>Tap a card to see every record in that category. Use the month picker to look at another month.</li>
+              <li>Leave the budget at 0 if you only want to group records without a limit.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="budget">Open Budget</button>
+          </article>
+          <article class="help-card" id="help-stats">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-chart"></use></svg>Statistics</h3>
+            <p class="help-for">Totals and a category breakdown for any week, month or year.</p>
+            <ul class="help-steps">
+              <li>Choose Weekly, Monthly or Yearly, pick the date, and read the chart and the table below it.</li>
+              <li>The trend line compares this period with the previous one.</li>
+              <li>For the current month you also get a projection: your daily average and where the month is heading.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="stats">Open Statistics</button>
+          </article>
+          <article class="help-card" id="help-insights">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-bulb"></use></svg>Insights</h3>
+            <p class="help-for">Short, automatic observations about your spending.</p>
+            <ul class="help-steps">
+              <li>Open the view and read the list. Tap <strong>Refresh</strong> after adding new records.</li>
+              <li>Insights compare this month with last month, point out categories close to their budget, and spot weekend versus weekday habits.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="insights">Open Insights</button>
+          </article>
+          <article class="help-card" id="help-dashboard">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-home"></use></svg>Dashboard</h3>
+            <p class="help-for">Your month at a glance, on one screen.</p>
+            <ul class="help-steps">
+              <li>The top cards show this month's expense, revenue and the difference.</li>
+              <li><strong>Upcoming</strong> lists what is due in the next 14 days: subscription renewals, debts, and recurring bills or income. Red means overdue. Tap a row to open it.</li>
+              <li><strong>Salary Allocation</strong> compares this month's income with the total of your monthly budgets.</li>
+              <li>Further down: this month versus last month, a cashflow chart, a spending heatmap (tap a day for details) and category trends.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="dashboard">Open Dashboard</button>
+          </article>
+          <article class="help-card" id="help-goals">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-target"></use></svg>Savings Goals</h3>
+            <p class="help-for">Save toward something specific, like an emergency fund or a trip.</p>
+            <ul class="help-steps">
+              <li>Add a goal with a target amount and, if you like, a deadline.</li>
+              <li>Tap <strong>Add money</strong> on a goal each time you put money aside. Choose Deposit to add, Withdraw to take money out.</li>
+              <li>The bar shows your progress. With a deadline, the goal also tells you how much to save per month.</li>
+              <li><strong>History</strong> lists every deposit and withdrawal. Deposits do not change your records or budgets.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="goals">Open Savings Goals</button>
+          </article>
+          <article class="help-card" id="help-targets">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-trophy"></use></svg>Target</h3>
+            <p class="help-for">A checklist of things you want to achieve by a certain age.</p>
+            <ul class="help-steps">
+              <li>Enter your current age, then add each target with the age you want to reach it by.</li>
+              <li>Targets are laid out as a timeline. Tick one off when you achieve it, or edit it in place.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="targets">Open Target</button>
+          </article>
+          <article class="help-card" id="help-recurring">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-repeat"></use></svg>Recurring</h3>
+            <p class="help-for">Bills or income that repeat every month, such as rent or salary.</p>
+            <ul class="help-steps">
+              <li>Add a rule with the category, amount, a note and the day of the month it happens.</li>
+              <li>On that day the record is added for you automatically when you open the app. You can also tap <strong>Run Due Recurring</strong>.</li>
+              <li>Upcoming rules also appear on the Dashboard.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="recurring">Open Recurring</button>
+          </article>
+          <article class="help-card" id="help-debts">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-card"></use></svg>Debts</h3>
+            <p class="help-for">Money you lent to someone, or money you owe.</p>
+            <ul class="help-steps">
+              <li>Add the person, choose <strong>Owes me</strong> or <strong>I owe</strong>, the amount, and a due date if there is one.</li>
+              <li>The summary shows how much is owed to you, how much you owe, and the difference.</li>
+              <li>Tap <strong>Mark paid</strong> once it is settled. Overdue debts show in red here and on the Dashboard.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="debts">Open Debts</button>
+          </article>
+          <article class="help-card" id="help-subscriptions">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-tv"></use></svg>Subscriptions</h3>
+            <p class="help-for">Services you pay for regularly, such as Netflix or a gym.</p>
+            <ul class="help-steps">
+              <li>Add the service with its amount, whether it bills monthly or yearly, and the next renewal date.</li>
+              <li>The summary shows what all subscriptions cost per month and per year.</li>
+              <li>When a renewal is due, tap <strong>Pay &amp; Record</strong>: an expense is logged and the renewal date moves forward one cycle.</li>
+              <li>Cancel a subscription you stopped so it no longer counts.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="subscriptions">Open Subscriptions</button>
+          </article>
+          <article class="help-card" id="help-settings">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-settings"></use></svg>Settings</h3>
+            <p class="help-for">Preferences, alerts, templates and your data.</p>
+            <ul class="help-steps">
+              <li>Set the currency symbol shown in front of amounts.</li>
+              <li>Turn on <strong>Budget Alerts</strong> to get a notification at 80% of a budget and when you go over.</li>
+              <li>Manage your Quick Templates.</li>
+              <li><strong>Export JSON</strong> saves a full backup; <strong>Import JSON</strong> restores one. <strong>Generate PDF</strong> makes a monthly report.</li>
+            </ul>
+            <button type="button" class="btn btn-secondary btn-small" data-open-view="settings">Open Settings</button>
+          </article>
+          </div>
+
+          <article class="help-card" id="help-extras">
+            <h3><svg class="icon" aria-hidden="true"><use href="#i-zap"></use></svg>Handy things</h3>
+            <ul class="help-steps">
+              <li><strong>Quick add:</strong> the purple <strong>+</strong> button (or the N key) jumps to Add Record. Press <strong>/</strong> to search records.</li>
+              <li><strong>Assistant:</strong> the microphone button opens a chat. Type or speak, for example "spent 50 on fuel" or "今天吃鸡饭18块", to add records or ask what you spent.</li>
+              <li><strong>Receipts:</strong> attach photos when adding a record; the paperclip on a record opens them.</li>
+              <li><strong>Undo:</strong> after deleting a record, or adding money to a goal, an Undo button appears for a few seconds.</li>
+              <li><strong>Offline:</strong> an Offline badge appears in the header when there is no connection. Keep using the app; changes sync when you are back online.</li>
+              <li><strong>Dark mode:</strong> the moon or sun button in the header switches the theme.</li>
+              <li><strong>Backups:</strong> your data is saved to your account in the cloud. Settings also lets you download a JSON backup.</li>
+            </ul>
+          </article>
+        </section>
       </div> <!-- .view-container -->
       </div>
 
@@ -1075,7 +1258,7 @@
       </div>
     </div>
 
-    <script type="module" src="./app.js?v=10"></script>
+    <script type="module" src="./app.js?v=11"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

@@ -15,12 +15,12 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - **Recurring transactions** — auto-add monthly bills/income
 - **Subscriptions** tracking with renewal dates and billing cycles
 - **Debts & lending** — track who owes you and what you owe
-- **Savings goals** with targets, deadlines, and progress
+- **Savings goals** with targets and deadlines; add deposits and withdrawals to each goal, see its history, and the amount needed per month to hit the deadline
 
 ### Insights & reporting
 - **Statistics** by weekly / monthly / yearly range, with category breakdown and charts
 - Spending **projections** (daily average, projected total, days left)
-- **Dashboard** — monthly overview, salary allocation, month-over-month comparison, cashflow chart, spending heatmap, category trends (pick any of your own categories to plot), and budget alerts
+- **Dashboard** — monthly overview, **upcoming** items for the next 14 days (subscription renewals, debt due dates, recurring bills and income, with overdue flags), salary allocation, month-over-month comparison, cashflow chart, spending heatmap, category trends (pick any of your own categories to plot), and budget alerts
 - Auto-generated **spending insights**
 - Search and **advanced filters** (date range, type, category, amount range, tag)
 
@@ -28,10 +28,11 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - **Receipt scanning** — capture/upload a receipt and auto-extract the amount and text; attach photos to records
 - **Smart assistant** — add records by voice or text in English / Chinese / mixed
 - **Budget alerts** — browser notifications at 80% and over-budget
+- **Help & Guide** view explaining every feature in plain words, a "What's this?" link on each screen, and a first-run tip for new users
 - Light / **dark mode**
 - Custom currency symbol
 - **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup
-- Installable **PWA** with offline service worker
+- Installable **PWA** that works offline: the service worker caches the app shell and Firestore keeps a local copy of your data, so records load without a connection and changes made offline sync when you are back online (an "Offline" badge shows in the header)
 - Cloud sync via Firebase (Email/Password or Google sign-in + Firestore)
 
 ## Firebase setup
@@ -78,12 +79,18 @@ From this folder run:
 
 Then open: http://localhost:5500
 
+## Tests
+Pure logic (upcoming-items date math, savings-goal progress) has unit tests that run on Node 22+ with no dependencies:
+
+- `node --test`
+
 ## Project structure
 - `index.html` — app shell and all views
 - `app.js` — main application logic
 - `firebase.js` / `firebase-config.js` — Firebase init and config
 - `utils.js` — shared helpers
-- `js/features/` — feature modules (goals, recurring, debts, subscriptions, templates, receipts)
+- `js/features/` — feature modules (goals, upcoming, recurring, debts, subscriptions, templates, receipts)
+- `tests/` — unit tests for the pure feature logic
 - `styles.css` — styling (light/dark theme)
 - `manifest.json` / `sw.js` — PWA manifest and service worker
 - `vercel.json` — Vercel SPA fallback and cache headers

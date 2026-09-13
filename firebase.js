@@ -15,6 +15,9 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import {
   getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   collection,
   doc,
   addDoc,
@@ -49,7 +52,18 @@ export async function initFirebase() {
 
   app = initializeApp(firebaseConfig);
   auth = getAuth(app);
-  db = getFirestore(app);
+
+  // Persistent local cache: records load from the device when offline and
+  // writes made offline are queued and synced once the connection returns.
+  // The multi-tab manager lets several open tabs share the same cache.
+  // If the browser refuses (no IndexedDB), fall back to the in-memory cache.
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }),
+    });
+  } catch {
+    db = getFirestore(app);
+  }
 
   // Improve cross-browser session behavior (especially mobile / private modes).
   // If local persistence is blocked, fall back to session persistence.
