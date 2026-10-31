@@ -52,6 +52,7 @@ const {
 
 const els = {
   authStatus: document.getElementById("authStatus"),
+  sidebarAccount: document.getElementById("sidebarAccount"),
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   signOutBtn: document.getElementById("signOutBtn"),
   configCard: document.getElementById("configCard"),
@@ -309,6 +310,13 @@ function applyTheme(theme) {
     els.themeToggleBtn.setAttribute("aria-pressed", String(isDark));
     els.themeToggleBtn.innerHTML = isDark ? icon("sun") : icon("moon");
     els.themeToggleBtn.title = isDark ? t("Switch to light mode") : t("Switch to dark mode");
+  }
+
+  // Browser chrome (and the Android status bar) takes the header colour of the active theme.
+  const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+  if (themeColorMeta) {
+    const headerBg = getComputedStyle(document.documentElement).getPropertyValue("--header-bg").trim();
+    themeColorMeta.setAttribute("content", headerBg || (isDark ? "#121826" : "#ffffff"));
   }
 
   // Update chart colors to match the theme.
@@ -822,6 +830,8 @@ function setAuthError(text) {
 
 function setAuthStatus(text) {
   els.authStatus.textContent = text;
+  // Phones hide the header label to keep the header on one row; the side menu shows it.
+  if (els.sidebarAccount) els.sidebarAccount.textContent = text;
 }
 
 function setAppError(text) {

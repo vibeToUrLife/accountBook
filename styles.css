@@ -41,6 +41,9 @@
 
   /* chrome / inputs */
   --header-bg: #ffffff;
+  /* Strip behind the iOS status bar in the installed app. iOS draws that text
+     in white (black-translucent), so the light theme needs a dark strip. */
+  --statusbar-bg: #4f46e5;
   --input-bg: #ffffff;
   --placeholder: #78859a;
   --focus-border: #4f46e5;
@@ -107,6 +110,7 @@
   --success: #34d399;
 
   --header-bg: #121826;
+  --statusbar-bg: #121826;
   --input-bg: #0f1626;
   --placeholder: #647488;
   --focus-border: #818cf8;
@@ -213,14 +217,21 @@ td.right,
   background: var(--header-bg);
   border-bottom: 1px solid var(--border);
 }
+/* Installed iPhone app: the page starts under the status bar, so reserve its
+   height above the header row (0px in a normal browser tab). */
+.app-header::before {
+  content: "";
+  display: block;
+  height: env(safe-area-inset-top, 0px);
+  background: var(--statusbar-bg);
+}
 
+/* Side insets for notched phones in landscape come from body's padding. */
 .app-header .container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 0;
-  padding-left: env(safe-area-inset-left, 0);
-  padding-right: env(safe-area-inset-right, 0);
+  padding: 12px 20px;
 }
 
 h1 {
@@ -253,6 +264,24 @@ h1 .icon { width: 22px; height: 22px; color: var(--accent); }
   border-radius: var(--radius-sm);
 }
 
+/* Sign out shows its label on wide screens and an icon on phones. */
+.signout-icon { display: none; }
+.sidebar-account { display: none; }
+
+/* Phones: keep the header on one row. The signed-in label moves into the side
+   menu (#sidebarAccount) and the header buttons become 44px icon squares. */
+@media (max-width: 640px) {
+  #authStatus { display: none; }
+  .sidebar-account:not(:empty) { display: block; }
+  #menuBtn, #themeToggleBtn, #signOutBtn { width: 44px; padding: 0; }
+  #langToggleBtn { padding: 0 12px; }
+  #langToggleBtn .icon { display: none; }
+  .signout-icon { display: inline-block; }
+  .signout-label { display: none; }
+  .offline-pill { padding: 3px 6px; }
+  .offline-pill-text { display: none; }
+}
+
 /* ============================================================
    SIDEBAR NAVIGATION
    ============================================================ */
@@ -274,14 +303,17 @@ h1 .icon { width: 22px; height: 22px; color: var(--accent); }
   bottom: 0;
   z-index: 100;
   width: 260px;
-  background: var(--surface);
+  /* In the installed iPhone app the drawer also runs under the status bar and
+     home indicator: pad for both and paint the status-bar strip like the header. */
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
+  background: linear-gradient(var(--statusbar-bg), var(--statusbar-bg)) top / 100% env(safe-area-inset-top, 0px) no-repeat, var(--surface);
   border-right: 1px solid var(--border);
   box-shadow: var(--shadow-lg);
   transform: translateX(-100%);
   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: hidden; /* only the nav list scrolls, so nothing slides under the status bar */
 }
 .sidebar.open { transform: translateX(0); }
 
@@ -301,11 +333,24 @@ h1 .icon { width: 22px; height: 22px; color: var(--accent); }
 }
 .sidebar-header h2 .icon { color: var(--accent); }
 
+.sidebar-account {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  overflow-wrap: anywhere;
+}
+
 .sidebar-nav {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 10px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 .sidebar-item {
@@ -803,7 +848,7 @@ input:focus, select:focus, textarea:focus {
   .btn { padding: 12px 16px; font-size: 14px; min-height: 44px; }
   .btn-small { padding: 10px 12px; min-height: 40px; font-size: 13px; }
 
-  .app-header .container { flex-wrap: wrap; gap: 8px; padding: 10px 0; }
+  .app-header .container { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
   h1 { font-size: 16px; flex-shrink: 0; }
   .header-right { gap: 6px; flex-wrap: wrap; justify-content: flex-end; flex: 1; }
   #authStatus { font-size: 11px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -926,7 +971,7 @@ input:focus, select:focus, textarea:focus {
 
 /* extra small screens */
 @media (max-width: 400px) {
-  .app-header .container { padding: 8px 0; }
+  .app-header .container { padding: 8px 12px; }
   h1 { font-size: 14px; }
   .header-right { gap: 4px; }
   .header-right .btn { padding: 8px; font-size: 11px; }
@@ -1276,7 +1321,8 @@ input:focus, select:focus, textarea:focus {
 .receipt-lightbox {
   position: fixed; inset: 0; z-index: 10000;
   display: flex; align-items: center; justify-content: center;
-  background: rgba(0, 0, 0, 0.85); cursor: zoom-out; padding: 20px;
+  background: rgba(0, 0, 0, 0.85); cursor: zoom-out;
+  padding: max(20px, env(safe-area-inset-top, 0px)) 20px max(20px, env(safe-area-inset-bottom, 0px));
 }
 .receipt-lightbox img { max-width: 100%; max-height: 100%; border-radius: var(--radius-sm); }
 
@@ -1632,7 +1678,7 @@ input:focus, select:focus, textarea:focus {
   .stack { gap: 8px; }
   .edit-modal { max-height: 100vh; border-radius: 0; }
   .edit-modal-overlay { align-items: stretch; }
-  .app-header .container { padding: 4px 0; }
+  .app-header .container { padding: 4px 12px; }
   .dashboard-grid { grid-template-columns: repeat(4, 1fr); gap: 6px; }
   .dash-card { padding: 8px 6px; }
   .dash-card-value { font-size: 14px; }
