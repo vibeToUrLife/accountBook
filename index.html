@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=15" />
+    <link rel="stylesheet" href="./styles.css?v=16" />
     <!-- Start downloading the Firebase SDK right away; otherwise it is only found
          after app.js and firebase.js have been fetched and parsed. -->
     <link rel="modulepreload" href="./firebase.js?v=2" />
@@ -547,7 +547,8 @@
 
           <div class="stats-chart-card" aria-label="Statistics chart">
             <div id="statsChartMessage" class="muted small" hidden></div>
-            <canvas id="statsChart" height="140"></canvas>
+            <!-- Chart.js fills this box; the category chips below double as the legend. -->
+            <div class="stats-chart-box"><canvas id="statsChart"></canvas></div>
           </div>
 
           <div class="stats-breakdown">
@@ -1302,7 +1303,7 @@
     </div>
 
     <script type="module" src="./js/boot.js?v=1"></script>
-    <script type="module" src="./app.js?v=14"></script>
+    <script type="module" src="./app.js?v=15"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

@@ -624,12 +624,12 @@ async function renderStatsChart(range, start, endExclusive) {
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    cutout: "62%",
+    cutout: "66%",
+    layout: { padding: 4 },
     plugins: {
-      legend: {
-        position: "bottom",
-        labels: { color: text, padding: 12, usePointStyle: true, pointStyle: "circle" },
-      },
+      // No legend inside the chart: with many categories it took most of the
+      // space. The Category Breakdown chips below use the same colours.
+      legend: { display: false },
       tooltip: {
         callbacks: {
           label: (context) => {
@@ -647,24 +647,34 @@ async function renderStatsChart(range, start, endExclusive) {
     statsChartInstance.destroy();
   }
 
-  // Draw "Total <amount>" in the doughnut's center hole.
+  // "Total" and the amount in the doughnut's hole, sized from the hole itself
+  // so the amount never runs over the ring, whatever the screen size or total.
   const centerTextPlugin = {
     id: "donutCenterText",
     afterDraw(chart) {
-      const { ctx: c, chartArea } = chart;
-      if (!chartArea) return;
-      const cx = (chartArea.left + chartArea.right) / 2;
-      const cy = (chartArea.top + chartArea.bottom) / 2;
+      const arc = chart.getDatasetMeta(0)?.data?.[0];
+      if (!arc) return;
+      const { x, y, innerRadius } = arc.getProps(["x", "y", "innerRadius"], true);
+      if (!(innerRadius > 0)) return;
+      const c = chart.ctx;
+      const amount = money(totalExpense);
+      const numberFont = (px) => `700 ${px}px 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace`;
+      const maxWidth = innerRadius * 1.6; // stays inside the hole with a margin
+      let size = Math.min(28, Math.floor(innerRadius * 0.4));
       c.save();
+      c.font = numberFont(size);
+      while (size > 9 && c.measureText(amount).width > maxWidth) {
+        size -= 1;
+        c.font = numberFont(size);
+      }
+      const labelSize = Math.max(10, Math.round(size * 0.5));
       c.textAlign = "center";
       c.textBaseline = "middle";
       c.fillStyle = text;
-      c.font = "600 12px system-ui, -apple-system, sans-serif";
+      c.fillText(amount, x, y + labelSize * 0.6);
+      c.font = `600 ${labelSize}px Inter, system-ui, -apple-system, sans-serif`;
       c.globalAlpha = 0.7;
-      c.fillText(t("Total"), cx, cy - 11);
-      c.globalAlpha = 1;
-      c.font = "700 17px system-ui, -apple-system, sans-serif";
-      c.fillText(money(totalExpense), cx, cy + 8);
+      c.fillText(t("Total"), x, y - size * 0.6);
       c.restore();
     },
   };

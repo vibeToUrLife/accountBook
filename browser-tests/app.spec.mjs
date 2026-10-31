@@ -452,6 +452,34 @@ test("charts: Chart.js loads from the site only when a chart screen opens", asyn
   check.done();
 });
 
+test("statistics doughnut: fills the card on a phone and fits a 320px screen", async () => {
+  const check = checks();
+  const seed = [...formSeed];
+  ["Food", "Transport", "Rental"].forEach((name, i) => seed.push(tx("s" + i, "c" + (i + 1), 100 + i * 37.5, "expense", "2026-10-1" + i, { categoryName: name })));
+  for (const width of [393, 320]) {
+    const { ctx, page, errors } = await openApp(browser, base, { seed, width });
+    try {
+      await view(page, "stats");
+      await page.waitForFunction(() => window.Chart?.getChart?.("statsChart"), null, { timeout: 5000 });
+      await settle(page, 300);
+      const r = await page.evaluate(() => {
+        const chart = window.Chart.getChart("statsChart");
+        const arc = chart.getDatasetMeta(0).data[0];
+        return { outer: Math.round(arc.outerRadius), legend: chart.options.plugins.legend.display, scrollW: document.documentElement.scrollWidth };
+      });
+      if (width === 393) {
+        check("the doughnut is large on a phone (was ~36px radius)", r.outer >= 100, `outer radius ${r.outer}`);
+        check("no legend inside the chart (the chips below are the legend)", r.legend === false);
+      }
+      check(`Statistics doesn't scroll sideways at ${width}px`, r.scrollW <= width, `scrollWidth ${r.scrollW}`);
+      check(`no page errors at ${width}px`, errors.length === 0, errors.join(" | "));
+    } finally {
+      await ctx.close();
+    }
+  }
+  check.done();
+});
+
 // ── Budget alerts ───────────────────────────────────────────────────────────
 
 test("budget alerts are shown through the service worker (needed on iPhone)", async () => {

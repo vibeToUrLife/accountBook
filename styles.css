@@ -1158,8 +1158,15 @@ input:focus, select:focus, textarea:focus {
 .projection-label .icon { color: var(--accent); }
 .projection-val { font-size: 14px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
 
-.stats-chart-card { padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm); }
-.stats-chart-card canvas { width: 100% !important; max-height: 240px; }
+.stats-chart-card { position: relative; padding: 16px; border-radius: var(--radius); border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow-sm); }
+/* The doughnut takes the box's full height (Chart.js sizes the canvas to it).
+   max-width keeps the canvas from holding the card at its default 300px width
+   on narrow screens. */
+.stats-chart-card { min-width: 0; }
+.stats-chart-box { position: relative; height: 300px; min-width: 0; }
+.stats-chart-box canvas { display: block; max-width: 100%; }
+@media (max-width: 979px) { .stats-chart-box { height: 260px; } }
+@media (max-width: 360px) { .stats-chart-box { height: 230px; } }
 
 .stats-breakdown { display: flex; flex-direction: column; gap: 12px; }
 .stats-breakdown-title { font-size: 15px; font-weight: 700; margin: 0; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
