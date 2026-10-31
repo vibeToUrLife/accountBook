@@ -85,6 +85,15 @@ Pure logic (upcoming-items date math, recurring catch-up, subscription renewal d
 
 - `node --test`
 
+Browser checks drive the real app in Chromium on a phone-sized screen (UTC+8, fixed clock) with an in-memory stand-in for Firebase: adding records (also offline), recurring catch-up, subscriptions, budgets, delete/Undo, backup import, the assistant, layout and launch:
+
+- `cd browser-tests && npm ci && npx playwright install chromium && npm test`
+
+## Continuous integration
+- **App tests** (`.github/workflows/ci.yml`): every push to `master` and every pull request runs the unit tests and the browser checks. Results show as ✓ / ✗ next to each commit and under the repository's Actions tab.
+- **Firestore rules** (`.github/workflows/firestore-rules.yml`): tests and deploys `firestore.rules` (see below).
+- **Website**: Vercel deploys `master` to https://accbook.vercel.app/ on every push (and usually gives other branches a preview URL). Vercel does not wait for the tests; to make sure only tested code reaches `master`, protect the branch: Settings → Rules → Rulesets → New branch ruleset for `master`, with "Require a pull request before merging" and "Require status checks to pass" (Unit tests, Browser checks).
+
 ## Project structure
 - `index.html` — app shell and all views
 - `app.js` — main application logic
@@ -100,6 +109,8 @@ Pure logic (upcoming-items date math, recurring catch-up, subscription renewal d
 - `manifest.json` / `sw.js` — PWA manifest and service worker
 - `vercel.json` — Vercel SPA fallback and cache headers
 - `firestore.rules`, `firebase.json`, `.firebaserc` — Firestore security rules and the Firebase CLI config used to deploy them
+- `browser-tests/` — browser checks of the app (Playwright; own `package.json`)
+- `.github/workflows/ci.yml` — runs the unit tests and browser checks
 - `firestore-tests/` — emulator tests for the rules (own `package.json`, kept out of the repository root so Vercel keeps serving the site as plain files)
 - `.github/workflows/firestore-rules.yml` — tests and deploys the rules
 

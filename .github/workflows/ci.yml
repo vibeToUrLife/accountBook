@@ -1,0 +1,48 @@
+# Tests the app on every push to master and on every pull request:
+#   Unit tests     – `node --test` (dates, money, recurring, backups, translations)
+#   Browser checks – browser-tests/: the real app in Chromium on a phone-sized
+#                    screen, with an in-memory stand-in for Firebase
+# The site itself is deployed by Vercel; see README → Continuous integration.
+name: App tests
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# A newer push to the same branch replaces a run still in progress.
+concurrency:
+  group: app-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: node --test
+
+  browser:
+    name: Browser checks
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: browser-tests
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: browser-tests/package-lock.json
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm test

@@ -1,5 +1,6 @@
-# Firestore rules tests (firestore-tests/)
+# Test tooling (installed per folder)
 firestore-tests/node_modules/
+browser-tests/node_modules/
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
