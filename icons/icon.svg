@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Account Book app icon, full-bleed master. The PNGs next to this file are renders of it:
+       apple-touch-icon.png (180, as is), icon-192/512.png (corners rounded, rx 115 of 512),
+       icon-maskable-192/512.png (artwork scaled to 0.84 so it stays in the maskable safe circle). -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#6c6af5"/>
+      <stop offset="1" stop-color="#4135c9"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.22" cy="0.12" r="0.75">
+      <stop offset="0" stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#e6e8ff"/>
+    </linearGradient>
+    <filter id="drop" x="-25%" y="-25%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#1e1b4b" flood-opacity="0.35"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="0" fill="url(#bg)"/>
+  <rect width="512" height="512" rx="0" fill="url(#glow)"/>
+  <g transform="translate(256 256) scale(1) translate(-268 -249)">
+    <g transform="rotate(-11 252 170)">
+      <rect x="140" y="104" width="224" height="132" rx="20" fill="#34d399"/>
+      <rect x="140" y="104" width="224" height="132" rx="20" fill="none" stroke="#059669" stroke-opacity=".45" stroke-width="6"/>
+      <circle cx="252" cy="150" r="20" fill="none" stroke="#047857" stroke-opacity=".45" stroke-width="7"/>
+    </g>
+    <g filter="url(#drop)">
+      <rect x="104" y="172" width="296" height="232" rx="52" fill="url(#body)"/>
+      <path d="M156 172h192a52 52 0 0 1 52 52v6H104v-6a52 52 0 0 1 52-52z" fill="#c7cdfd"/>
+      <path d="M318 252h82a32 32 0 0 1 32 32v40a32 32 0 0 1-32 32h-82a52 52 0 0 1 0-104z" fill="#4f46e5"/>
+      <circle cx="326" cy="304" r="17" fill="#ffffff"/>
+    </g>
+  </g>
+</svg>
