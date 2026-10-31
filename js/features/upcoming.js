@@ -38,8 +38,10 @@ function nextRecurringDate(dayOfMonth, today, monthOffset = 0) {
   return dateToISO(d);
 }
 
-// Mirrors the duplicate check the recurring auto-run uses when it records a rule.
+// Whether the rule's record for that date exists: the rule is marked as
+// recorded through that month (see recurring.js), or a matching record is there.
 function recordedOn(rule, dateISO, transactions) {
+  if (rule.lastPostedMonth && rule.lastPostedMonth >= dateISO.slice(0, 7)) return true;
   return transactions.some((t) =>
     t.dateISO === dateISO &&
     t.categoryId === rule.categoryId &&
@@ -48,7 +50,7 @@ function recordedOn(rule, dateISO, transactions) {
   );
 }
 
-import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
 export function computeUpcoming({ subscriptions = [], debts = [], recurringRules = [], transactions = [], today, horizonDays = 14 }) {
   const horizonEnd = addDaysISO(today, horizonDays);
   const items = [];

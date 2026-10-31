@@ -1,4 +1,4 @@
-const CACHE_NAME = "accountbook-v18";
+const CACHE_NAME = "accountbook-v19";
 const CDN_CACHE = "accountbook-cdn-v16";
 // The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
 // /index.html with a 308 to /, and a page load can't be answered with a cached
@@ -6,13 +6,26 @@ const CDN_CACHE = "accountbook-cdn-v16";
 const SHELL = "./";
 // How long a page load waits for the network before using the cached shell.
 const NAV_TIMEOUT_MS = 3000;
+// Versioned like the imports in app.js, so a cached copy never mixes with
+// files from another release.
 const PRECACHE = [
   SHELL,
-  "./styles.css?v=13",
-  "./app.js?v=12",
-  "./utils.js?v=6",
-  "./firebase.js",
+  "./styles.css?v=14",
+  "./app.js?v=13",
+  "./utils.js?v=7",
+  "./firebase.js?v=2",
   "./firebase-config.js",
+  "./js/i18n.js?v=2",
+  "./js/i18n.zh.js?v=2",
+  "./js/backup.js?v=1",
+  "./js/features/debts.js?v=2",
+  "./js/features/goals.js?v=3",
+  "./js/features/receipts.js?v=2",
+  "./js/features/recurring.js?v=2",
+  "./js/features/subscriptions.js?v=2",
+  "./js/features/targets.js?v=2",
+  "./js/features/templates.js?v=2",
+  "./js/features/upcoming.js?v=2",
   "./favicon.svg?v=2",
 ];
 

@@ -2,7 +2,7 @@
 // A checklist timeline of things you want to achieve (not just money) by a
 // certain age. Items are sorted into a timeline by their target age; each can
 // be ticked off when achieved, edited in place, or removed.
-import { t as tr } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
+import { t as tr } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
 export function createTargets(ctx) {
   const { icon, escapeHtml, normalizeText, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, setDoc, doc, serverTimestamp } = firestore;

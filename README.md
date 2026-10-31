@@ -12,7 +12,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - Category balance auto-updates within the budget period: `balance = budget + revenue - expense`
 - **Tags** on records, plus auto-category suggestions and duplicate-record warnings
 - **Quick templates** — save common records as one-tap chips
-- **Recurring transactions** — auto-add monthly bills/income
+- **Recurring transactions** — auto-add monthly bills/income; months missed while the app was closed are added when it next opens, and a rule on the 31st uses the last day of shorter months
 - **Subscriptions** tracking with renewal dates and billing cycles
 - **Debts & lending** — track who owes you and what you owe
 - **Savings goals** with targets and deadlines; add deposits and withdrawals to each goal, see its history, and the amount needed per month to hit the deadline
@@ -32,7 +32,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - **English / 简体中文** interface: switch with the EN / 中文 button in the header; the choice is remembered, and a Chinese browser gets Chinese by default
 - Light / **dark mode**
 - Custom currency symbol
-- **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup
+- **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup (restores records with their original ids, so links to categories survive and importing the same file twice doesn't duplicate anything; receipt photos are not part of the backup)
 - Installable **PWA** that works offline: the service worker caches the app shell and Firestore keeps a local copy of your data, so records load without a connection and changes made offline sync when you are back online (an "Offline" badge shows in the header)
 - Cloud sync via Firebase (Email/Password or Google sign-in + Firestore)
 
@@ -81,7 +81,7 @@ From this folder run:
 Then open: http://localhost:5500
 
 ## Tests
-Pure logic (upcoming-items date math, savings-goal progress, the translation layer and its dictionary coverage) has unit tests that run on Node 22+ with no dependencies:
+Pure logic (upcoming-items date math, recurring catch-up, subscription renewal dates, money rounding and per-month budgets, savings-goal progress, backup parsing, the translation layer and its dictionary coverage) has unit tests that run on Node 22+ with no dependencies:
 
 - `node --test`
 
@@ -91,6 +91,7 @@ Pure logic (upcoming-items date math, savings-goal progress, the translation lay
 - `firebase.js` / `firebase-config.js` — Firebase init and config
 - `utils.js` — shared helpers
 - `js/i18n.js` / `js/i18n.zh.js` — translation layer and the Simplified Chinese dictionary (English text is the key)
+- `js/backup.js` — reads backup files for import (validates every field, keeps record ids)
 - `js/features/` — feature modules (goals, upcoming, recurring, debts, subscriptions, templates, receipts)
 - `tests/` — unit tests for the pure feature logic
 - `styles.css` — styling (light/dark theme)

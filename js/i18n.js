@@ -4,7 +4,7 @@
 //                      and the placeholder / title / aria-label attributes
 // Anything without a translation falls back to the English key, so a missing
 // entry can never blank out the UI.
-import { zh } from "./i18n.zh.js";
+import { zh } from "./i18n.zh.js?v=2";
 
 export { zh };
 

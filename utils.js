@@ -63,6 +63,32 @@ export function debounce(fn, ms) {
   };
 }
 
+/**
+ * Round a money amount to whole cents. Amounts are stored as decimals, so sums
+ * drift by tiny fractions (1.01 + 7.19 + 1.80 = 10.000000000000002); round a
+ * total before comparing it with a budget or target. Never returns -0.
+ */
+export function roundMoney(n) {
+  const v = Math.round((Number(n) || 0) * 100) / 100;
+  return v === 0 ? 0 : v;
+}
+
+/**
+ * Budget for `monthKey` ("YYYY-MM") from a category's per-month budgets: that
+ * month's own entry, otherwise the latest earlier month's (a change carries
+ * forward until the next change). null when no month at or before it has one.
+ */
+export function monthlyBudgetFor(monthlyBudgets, monthKey) {
+  if (!monthlyBudgets || typeof monthlyBudgets !== "object") return null;
+  let bestKey = null;
+  for (const [key, value] of Object.entries(monthlyBudgets)) {
+    if (!/^\d{4}-\d{2}$/.test(key) || key > monthKey) continue;
+    if (value == null || !Number.isFinite(Number(value))) continue;
+    if (bestKey === null || key > bestKey) bestKey = key;
+  }
+  return bestKey === null ? null : Number(monthlyBudgets[bestKey]);
+}
+
 /** Parse a value into a positive amount rounded to 2 decimals, or null. */
 export function parsePositiveAmount(value) {
   const n = Number(value);

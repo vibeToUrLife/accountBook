@@ -1,5 +1,5 @@
 // Quick Templates feature module. Reads/writes the form via ctx.els.
-import { t as tr } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
+import { t as tr } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
 export function createTemplates(ctx) {
   const { els, money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, setAppError, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, doc, serverTimestamp } = firestore;

@@ -7,7 +7,7 @@ import {
   signInWithGooglePopup,
   userCollections,
   firestoreApi,
-} from "./firebase.js";
+} from "./firebase.js?v=2";
 
 import {
   todayISO,
@@ -24,17 +24,20 @@ import {
   escapeHtml,
   parseTags,
   icon,
-} from "./utils.js?v=6";
+  roundMoney,
+  monthlyBudgetFor,
+} from "./utils.js?v=7";
 
-import { createDebts } from "./js/features/debts.js";
-import { createSubscriptions } from "./js/features/subscriptions.js";
-import { createGoals } from "./js/features/goals.js?v=2";
-import { createTargets } from "./js/features/targets.js";
-import { createTemplates } from "./js/features/templates.js";
-import { createReceipts } from "./js/features/receipts.js";
-import { createRecurring } from "./js/features/recurring.js";
-import { createUpcoming } from "./js/features/upcoming.js?v=1";
-import { t, initLang, getLang, setLang, translateDom, locale } from "./js/i18n.js?v=1";
+import { createDebts } from "./js/features/debts.js?v=2";
+import { createSubscriptions } from "./js/features/subscriptions.js?v=2";
+import { createGoals } from "./js/features/goals.js?v=3";
+import { createTargets } from "./js/features/targets.js?v=2";
+import { createTemplates } from "./js/features/templates.js?v=2";
+import { createReceipts } from "./js/features/receipts.js?v=2";
+import { createRecurring } from "./js/features/recurring.js?v=2";
+import { createUpcoming } from "./js/features/upcoming.js?v=2";
+import { t, initLang, getLang, setLang, translateDom, locale } from "./js/i18n.js?v=2";
+import { parseBackup, exportRecord, cleanCurrencySymbol } from "./js/backup.js?v=1";
 
 const {
   collection,
@@ -48,6 +51,8 @@ const {
   orderBy,
   query,
   serverTimestamp,
+  batch,
+  runTransaction,
 } = firestoreApi();
 
 const els = {
@@ -344,8 +349,7 @@ function initTheme() {
 }
 
 function money(n) {
-  const v = Number(n || 0);
-  return `${currencySymbol}${v.toFixed(2)}`;
+  return `${currencySymbol}${roundMoney(n).toFixed(2)}`;
 }
 
 /* Stable colour derived from a category id, so any number of user categories
@@ -413,11 +417,12 @@ function isBudgetActiveForReference(category, budgetPeriod, referenceDate) {
 
 /**
  * Effective budget amount for a category in the period being viewed.
- * Monthly categories may carry per-month overrides in `monthlyBudgets`
- * (keyed "YYYY-MM"); a month with no explicit override falls back to the
- * base `budget`. Months before the budget's start month get 0 so a budget
- * added this month doesn't retroactively appear in earlier months.
- * Yearly/lifetime budgets always use the base `budget`.
+ * Monthly categories carry per-month amounts in `monthlyBudgets` (keyed
+ * "YYYY-MM"). A month without its own amount uses the latest earlier month's,
+ * so changing October changes October onward but never September. Months
+ * before the budget's start month get 0 so a budget added this month doesn't
+ * retroactively appear in earlier months. Categories without per-month amounts
+ * (and yearly/lifetime budgets) use the base `budget`.
  */
 function effectiveBudgetFor(category, budgetPeriod, referenceDate) {
   const base = Number(category?.budget) || 0;
@@ -427,8 +432,8 @@ function effectiveBudgetFor(category, budgetPeriod, referenceDate) {
     const ref = referenceDate || budgetMonthRefDate();
     // Months earlier than when the budget was first set predate it.
     if (!isBudgetActiveForReference(category, "month", ref)) return 0;
-    const override = map[currentMonthValue(ref)];
-    if (override != null && Number.isFinite(Number(override))) return Number(override);
+    const amount = monthlyBudgetFor(map, currentMonthValue(ref));
+    if (amount != null) return amount;
   }
   return base;
 }
@@ -785,9 +790,10 @@ const ctx = {
   parsePositiveAmount,
   clamp,
   setAppError,
+  friendlyDbError,
   showUndoToast,
   userCollections,
-  firestore: { collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, onSnapshot, orderBy, query, serverTimestamp },
+  firestore: { collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, onSnapshot, orderBy, query, serverTimestamp, batch, runTransaction },
   get refresh() { return renderAll; },
 };
 
@@ -844,17 +850,25 @@ function setAppError(text) {
 let pendingUndo = null;
 let pendingConfirm = null;
 
-function clearUndoToast() {
+// Closes the Undo toast. Unless the change was just undone, the toast's
+// `onExpire` runs: the change is now final (used to remove a deleted record's
+// photos only once Undo is no longer possible).
+function clearUndoToast({ undone = false } = {}) {
+  const onExpire = undone ? null : pendingUndo?.onExpire;
   if (pendingUndo?.timer) {
     clearTimeout(pendingUndo.timer);
   }
   pendingUndo = null;
   if (els.undoToast) els.undoToast.hidden = true;
   if (els.undoText) els.undoText.textContent = "";
+  if (onExpire) Promise.resolve().then(onExpire).catch(() => {});
 }
 
-function showUndoToast({ message, onUndo }) {
-  if (!els.undoToast || !els.undoText || !els.undoBtn) return;
+function showUndoToast({ message, onUndo, onExpire }) {
+  if (!els.undoToast || !els.undoText || !els.undoBtn) {
+    if (onExpire) Promise.resolve().then(onExpire).catch(() => {});
+    return;
+  }
 
   // Only allow one pending undo at a time.
   clearUndoToast();
@@ -867,7 +881,7 @@ function showUndoToast({ message, onUndo }) {
     els.undoBtn.disabled = true;
     try {
       await onUndo();
-      clearUndoToast();
+      clearUndoToast({ undone: true });
     } catch (e) {
       setAppError(friendlyDbError(e));
       clearUndoToast();
@@ -878,6 +892,7 @@ function showUndoToast({ message, onUndo }) {
 
   pendingUndo = {
     onUndo: undoHandler,
+    onExpire,
     timer: setTimeout(() => {
       clearUndoToast();
     }, 5000),
@@ -896,7 +911,9 @@ function clearConfirmToast() {
   if (els.confirmText) els.confirmText.textContent = "";
 }
 
-function showConfirmToast(message) {
+// `confirmLabel` names the confirm button (default "Delete"); `danger: false`
+// makes it a normal button for actions that don't remove anything.
+function showConfirmToast(message, { confirmLabel, danger = true } = {}) {
   if (!els.confirmToast || !els.confirmText || !els.confirmYesBtn || !els.confirmNoBtn) {
     return Promise.resolve(typeof window === "undefined" ? true : window.confirm(message));
   }
@@ -904,6 +921,8 @@ function showConfirmToast(message) {
   clearConfirmToast();
 
   els.confirmText.textContent = message;
+  els.confirmYesBtn.textContent = confirmLabel || t("Delete");
+  els.confirmYesBtn.classList.toggle("btn-danger", danger);
   els.confirmToast.hidden = false;
   els.confirmYesBtn.disabled = false;
   els.confirmNoBtn.disabled = false;
@@ -940,6 +959,10 @@ function stripUndefined(value) {
   if (value === null) return null;
   if (Array.isArray(value)) return value.map(stripUndefined);
   if (typeof value !== "object") return value;
+  // Keep Firestore Timestamps (and Dates) as they are: copied into a plain map,
+  // a restored record's createdAt would no longer sort with the others.
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value;
   const out = {};
   for (const [k, v] of Object.entries(value)) {
     const cleaned = stripUndefined(v);
@@ -997,7 +1020,18 @@ function computeCategoryTotals(categoryId, budgetPeriod, referenceDate) {
     if (tx.type === "expense") spent += tx.amount;
     else income += tx.amount;
   }
-  return { spent, income, balance: income - spent, budgetRange };
+  spent = roundMoney(spent);
+  income = roundMoney(income);
+  return { spent, income, balance: roundMoney(income - spent), budgetRange };
+}
+
+/**
+ * How much of a budget is used: spending minus income in the same category
+ * (refunds), never below 0. This matches Balance = budget + income − spent, so
+ * a card can't show a positive balance and "Over by" at the same time.
+ */
+function budgetUsed(spent, income) {
+  return Math.max(0, roundMoney(spent - income));
 }
 
 function renderCategorySelect() {
@@ -1051,7 +1085,8 @@ function renderCategoriesTable() {
       referenceDate
     );
     const budgetAmount = effectiveBudgetFor(c, period, referenceDate);
-    const effectiveBudgetBalance = budgetAmount + balance;
+    const effectiveBudgetBalance = roundMoney(budgetAmount + balance);
+    const used = budgetUsed(spent, income);
 
     const periodLabel =
       period === "month"
@@ -1062,12 +1097,12 @@ function renderCategoriesTable() {
 
     const hasBudget = budgetAmount > 0;
     // Raw (uncapped) percentage so we can tell "fully used" (=100%) apart from "over" (>100%).
-    const rawUsedPct = hasBudget ? (spent / (budgetAmount || 1)) * 100 : 0;
+    const rawUsedPct = hasBudget ? (used / (budgetAmount || 1)) * 100 : 0;
     const budgetUsedPct = Math.min(rawUsedPct, 100); // for the progress bar width
-    const overAmount = spent - budgetAmount;
+    const overAmount = roundMoney(used - budgetAmount);
     let statusClass = 'budget-ok';
     let statusLabel = '';
-    if (hasBudget && spent > 0) {
+    if (hasBudget && used > 0) {
       if (rawUsedPct > 100) {
         statusClass = 'budget-over';
         statusLabel = `<span class="budget-badge over">${t("Over by {amount}", { amount: money(overAmount) })}</span>`;
@@ -1082,7 +1117,7 @@ function renderCategoriesTable() {
 
     const progressColor = rawUsedPct > 100 ? 'var(--danger)' : rawUsedPct >= 100 ? 'var(--primary-strong, var(--primary))' : rawUsedPct >= 80 ? 'var(--warning)' : 'var(--primary)';
     const pctDisplay = hasBudget ? Math.round(rawUsedPct) : 0;
-    const net = income - spent;
+    const net = balance;
 
     const tr = document.createElement("tr");
     tr.dataset.categoryId = c.id;
@@ -1265,11 +1300,11 @@ function renderTransactionsTable() {
       ? `<div class="tag-chips">${tx.tags.map((t) => `<span class="tag-chip">${escapeHtml(t)}</span>`).join("")}</div>`
       : "";
     tr.innerHTML = `
-      <td data-label="Date">${escapeHtml(tx.dateISO)}</td>
-      <td data-label="Category">${escapeHtml(tx.categoryName || "")}</td>
-      <td data-label="Type">${escapeHtml(typeLabel)}</td>
-      <td class="right" data-label="Amount">${money(tx.amount)}</td>
-      <td data-label="Note">${escapeHtml(tx.note || "")}${tagsHtml}</td>
+      <td data-label="${escapeHtml(t("Date"))}">${escapeHtml(tx.dateISO)}</td>
+      <td data-label="${escapeHtml(t("Category"))}">${escapeHtml(tx.categoryName || "")}</td>
+      <td data-label="${escapeHtml(t("Type"))}">${escapeHtml(typeLabel)}</td>
+      <td class="right" data-label="${escapeHtml(t("Amount"))}">${money(tx.amount)}</td>
+      <td data-label="${escapeHtml(t("Note"))}">${escapeHtml(tx.note || "")}${tagsHtml}</td>
       <td>
         <div class="row-actions">
           <button class="btn btn-secondary btn-small" type="button" data-action="receipts-tx" data-id="${tx.id}" title="${t("Photos")}" aria-label="${t("Photos")}">${icon("paperclip", "icon-sm")}${tx.receiptCount ? " " + tx.receiptCount : ""}</button>
@@ -1396,7 +1431,7 @@ async function startListenersForUser(userId) {
   unsubSettings = onSnapshot(doc(settingsCol, "preferences"), (snap) => {
     if (snap.exists()) {
       const data = snap.data();
-      currencySymbol = data.currencySymbol || "";
+      currencySymbol = cleanCurrencySymbol(data.currencySymbol); // shown inside HTML by money()
       if (els.currencySymbolInput) els.currencySymbolInput.value = currencySymbol;
     }
     renderAll();
@@ -1545,6 +1580,7 @@ async function setSignedInUi(user) {
   setAuthError("");
   setAppError("");
   await startListenersForUser(uid);
+  flushReceiptPurges();
 }
 
 function friendlyAuthError(err) {
@@ -1635,11 +1671,24 @@ async function updateCategory() {
     budgetPeriod,
     updatedAt: serverTimestamp(),
   };
-  // Store the amount as this month's override. `merge: true` deep-merges the
-  // map, so other months' saved budgets are left untouched.
+  // Store the amount as this month's entry. `merge: true` deep-merges the map,
+  // so other months keep theirs, and later months without their own entry carry
+  // this one forward (see effectiveBudgetFor). The base `budget` only changes
+  // when the category wasn't monthly before, so earlier months stay as they were.
   if (budgetPeriod === "month") {
     const monthValue = els.budgetMonth.value || currentMonthValue();
     patch.monthlyBudgets = { [monthValue]: roundedBudget };
+    const before = categories.find((x) => x.id === editingCategoryId);
+    if (before && (before.budgetPeriod || "month") === "month") {
+      delete patch.budget;
+      // Saved before per-month budgets existed: keep the old amount for the
+      // months between its creation and this one.
+      const hasMonths = budgetStartMonthValue(before) !== null;
+      const createdMonth = before.createdAt?.toDate ? currentMonthValue(before.createdAt.toDate()) : null;
+      if (!hasMonths && createdMonth && createdMonth < monthValue) {
+        patch.monthlyBudgets[createdMonth] = Number(before.budget) || 0;
+      }
+    }
   }
   await setDoc(doc(categoriesCol, editingCategoryId), patch, { merge: true });
 
@@ -1928,10 +1977,10 @@ function renderBudgetRecordsModal(category) {
     const amountClass = tx.type === "expense" ? "val-negative" : "val-positive";
 
     tr.innerHTML = `
-      <td data-label="Date">${escapeHtml(tx.dateISO || "")}</td>
-      <td data-label="Type">${escapeHtml(typeLabel)}</td>
-      <td class="right ${amountClass}" data-label="Amount">${escapeHtml(money(tx.amount))}</td>
-      <td data-label="Note">${escapeHtml(tx.note || "")}</td>
+      <td data-label="${escapeHtml(t("Date"))}">${escapeHtml(tx.dateISO || "")}</td>
+      <td data-label="${escapeHtml(t("Type"))}">${escapeHtml(typeLabel)}</td>
+      <td class="right ${amountClass}" data-label="${escapeHtml(t("Amount"))}">${escapeHtml(money(tx.amount))}</td>
+      <td data-label="${escapeHtml(t("Note"))}">${escapeHtml(tx.note || "")}</td>
     `;
     els.budgetRecordsTbody.appendChild(tr);
   }
@@ -2013,13 +2062,65 @@ function cancelTxEdit() {
   if (els.cancelTxEdit) els.cancelTxEdit.hidden = true;
 }
 
-async function deleteTransactionById(txId) {
-  const { transactions: txCol } = userCollections(uid);
-  // Remove attached receipt photos first (subcollections aren't auto-deleted).
+// ─── Photos of deleted records ───
+// A record's photos live in a subcollection that deleting the record leaves
+// behind. They are removed once the record's Undo window has closed, so Undo
+// brings the photos back too. Pending removals are kept in localStorage in case
+// the app is closed first, and retried at the next start.
+const RECEIPT_PURGE_KEY = "accountBook.receiptPurge";
+
+function readReceiptPurges() {
   try {
-    await receipts.deleteAllForTx(txId);
-  } catch { /* ignore */ }
-  await deleteDoc(doc(txCol, txId));
+    const list = JSON.parse(localStorage.getItem(RECEIPT_PURGE_KEY) || "[]");
+    return Array.isArray(list) ? list.filter((e) => e && typeof e.uid === "string" && typeof e.txId === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeReceiptPurges(list) {
+  try {
+    if (list.length) localStorage.setItem(RECEIPT_PURGE_KEY, JSON.stringify(list));
+    else localStorage.removeItem(RECEIPT_PURGE_KEY);
+  } catch {
+    // storage blocked: photos are then only removed while the app stays open
+  }
+}
+
+function forgetReceiptPurge(ownerUid, txId) {
+  writeReceiptPurges(readReceiptPurges().filter((e) => !(e.uid === ownerUid && e.txId === txId)));
+}
+
+// Delete a record's photos if the record is still gone (Undo, or another
+// device, may have brought it back).
+async function purgeReceipts(ownerUid, txId) {
+  if (!ownerUid || ownerUid !== uid) return; // signed out / other account: retried later
+  if (navigator.onLine === false) return; // offline queries only see cached photos
+  try {
+    const { transactions: txCol } = userCollections(ownerUid);
+    const snap = await getDoc(doc(txCol, txId));
+    if (!snap.exists()) await receipts.deleteAllForTx(txId);
+    forgetReceiptPurge(ownerUid, txId);
+  } catch {
+    // stays queued; retried at the next start
+  }
+}
+
+async function flushReceiptPurges() {
+  for (const e of readReceiptPurges()) {
+    if (e.uid === uid) await purgeReceipts(e.uid, e.txId);
+  }
+}
+
+// Deletes the record now; its photos follow when purgeReceipts runs after the
+// Undo window (or flushReceiptPurges at the next start).
+function deleteTransactionById(txId) {
+  const { transactions: txCol } = userCollections(uid);
+  const queue = readReceiptPurges().filter((e) => !(e.uid === uid && e.txId === txId));
+  queue.push({ uid, txId });
+  writeReceiptPurges(queue);
+  // Not awaited: offline, a write only settles once the server has it.
+  deleteDoc(doc(txCol, txId)).catch((err) => setAppError(friendlyDbError(err)));
 }
 
 function updateNoteSuggestions() {
@@ -2064,7 +2165,7 @@ function computeTrend(range, start, endExclusive) {
       else prevRev += tx.amount;
     }
   }
-  return { curExp, curRev, prevExp, prevRev };
+  return { curExp: roundMoney(curExp), curRev: roundMoney(curRev), prevExp: roundMoney(prevExp), prevRev: roundMoney(prevRev) };
 }
 
 function renderTrend(range, start, endExclusive) {
@@ -3017,6 +3118,10 @@ function generateInsights() {
     if (tx.type === "expense") prevExpense += tx.amount;
     else prevRevenue += tx.amount;
   }
+  curExpense = roundMoney(curExpense);
+  curRevenue = roundMoney(curRevenue);
+  prevExpense = roundMoney(prevExpense);
+  prevRevenue = roundMoney(prevRevenue);
 
   const cards = [];
   const netCur = curRevenue - curExpense;
@@ -3111,7 +3216,11 @@ function generateInsights() {
     if ((cat.budgetPeriod || "month") !== "month") continue;
     const budgetAmount = effectiveBudgetFor(cat, "month", thisMonthRef);
     if (!budgetAmount || budgetAmount <= 0) continue;
-    const spent = curMonthTxs.filter((t) => t.categoryId === cat.id && t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    const catTxs = curMonthTxs.filter((t) => t.categoryId === cat.id);
+    const spent = budgetUsed(
+      catTxs.filter((t) => t.type === "expense").reduce((s, t) => s + t.amount, 0),
+      catTxs.filter((t) => t.type !== "expense").reduce((s, t) => s + t.amount, 0)
+    );
     const pct = (spent / budgetAmount) * 100;
     if (pct >= 80) budgetAlerts.push({ name: cat.name, spent, budget: budgetAmount, pct });
   }
@@ -3390,7 +3499,8 @@ function renderDashboard() {
       if (period !== "month") continue;
       const budgetAmount = effectiveBudgetFor(cat, period, monthRef);
       if (!budgetAmount || budgetAmount <= 0) continue;
-      const { spent } = computeCategoryTotals(cat.id, period, monthRef);
+      const totals = computeCategoryTotals(cat.id, period, monthRef);
+      const spent = budgetUsed(totals.spent, totals.income);
       const pct = (spent / budgetAmount) * 100;
 
       if (pct >= 80) {
@@ -3460,7 +3570,8 @@ function renderMonthComparison() {
         income += t.amount;
       }
     }
-    return { expense, income, byCat };
+    for (const id of Object.keys(byCat)) byCat[id] = roundMoney(byCat[id]);
+    return { expense: roundMoney(expense), income: roundMoney(income), byCat };
   };
 
   const cur = agg(thisMonth);
@@ -3901,7 +4012,7 @@ function updateBudgetAlertsUi() {
 async function saveCurrencySymbol() {
   const input = document.getElementById("currencySymbolInput");
   if (!input) return;
-  const symbol = input.value.trim().substring(0, 5);
+  const symbol = cleanCurrencySymbol(input.value);
   const { settings: settingsCol } = userCollections(uid);
   await setDoc(doc(settingsCol, "preferences"), { currencySymbol: symbol }, { merge: true });
   currencySymbol = symbol;
@@ -3912,13 +4023,14 @@ async function saveCurrencySymbol() {
 function exportDataAsJson() {
   const data = {
     exportDate: new Date().toISOString(),
-    categories: categories.map((c) => ({ ...c })),
-    transactions: transactions.map((t) => ({ ...t })),
-    savingsGoals: savingsGoals.map((g) => ({ ...g })),
-    targets: targets.map((t) => ({ ...t })),
-    recurringRules: recurringRules.map((r) => ({ ...r })),
-    debts: debts.map((d) => ({ ...d })),
-    subscriptions: subscriptions.map((s) => ({ ...s })),
+    categories: categories.map(exportRecord),
+    transactions: transactions.map(exportRecord),
+    savingsGoals: savingsGoals.map(exportRecord),
+    targets: targets.map(exportRecord),
+    recurringRules: recurringRules.map(exportRecord),
+    debts: debts.map(exportRecord),
+    subscriptions: subscriptions.map(exportRecord),
+    templates: templates.map(exportRecord),
     settings: { currencySymbol },
   };
 
@@ -3934,114 +4046,72 @@ function exportDataAsJson() {
 async function importDataFromJson(file) {
   const statusEl = document.getElementById("importStatus");
   if (!file) return;
+  const setStatus = (iconName, message) => {
+    if (statusEl) statusEl.innerHTML = `${icon(iconName, "icon-sm")} ${escapeHtml(message)}`;
+  };
 
   try {
     if (statusEl) statusEl.textContent = t("Reading file…");
-    const text = await file.text();
-    const data = JSON.parse(text);
-
-    if (!data.categories || !data.transactions) {
-      if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} ${t("Invalid backup file format.")}`;
+    const cols = userCollections(uid);
+    const parsed = parseBackup(JSON.parse(await file.text()), {
+      today: todayISO(),
+      newId: () => doc(cols.transactions).id,
+    });
+    if (!parsed) {
+      setStatus("x-circle", t("Invalid backup file format."));
       return;
     }
-
+    if (statusEl) statusEl.textContent = "";
+    const ok = await showConfirmToast(t("Restore this backup? Its records replace the same records in your account; nothing else is deleted."), { confirmLabel: t("Restore"), danger: false });
+    if (!ok) return;
     if (statusEl) statusEl.textContent = t("Importing…");
 
-    const { categories: catCol, transactions: txCol, savingsGoals: goalsCol, targets: targetsCol, recurring: recCol, settings: settingsCol, debts: debtsCol, subscriptions: subsCol } = userCollections(uid);
-
-    // Import categories
-    let catCount = 0;
-    for (const c of data.categories) {
-      if (!c.name) continue;
-      const docData = { name: c.name, budget: c.budget || 0, budgetPeriod: c.budgetPeriod || "month", createdAt: serverTimestamp() };
-      if (c.monthlyBudgets && typeof c.monthlyBudgets === "object") docData.monthlyBudgets = c.monthlyBudgets;
-      await addDoc(catCol, docData);
-      catCount++;
-    }
-
-    // Import transactions
-    let txCount = 0;
-    for (const t of data.transactions) {
-      if (!t.categoryId || !t.amount) continue;
-      const docData = {
-        categoryId: t.categoryId, categoryName: t.categoryName || "", type: t.type || "expense",
-        amount: t.amount, note: t.note || "", noteLower: (t.note || "").toLowerCase(),
-        dateISO: t.dateISO || todayISO(), createdAt: serverTimestamp(),
-      };
-      await addDoc(txCol, docData);
-      txCount++;
-    }
-
-    // Import goals
-    let goalCount = 0;
-    if (data.savingsGoals) {
-      for (const g of data.savingsGoals) {
-        if (!g.name) continue;
-        await addDoc(goalsCol, { name: g.name, target: g.target || 0, deadline: g.deadline || "", createdAt: serverTimestamp() });
-        goalCount++;
+    // Records keep their ids from the file, so they link to their categories
+    // again and a second import overwrites instead of duplicating. `merge`
+    // keeps fields the file doesn't carry (such as a record's photo count).
+    // Up to 450 writes per batch (Firestore allows 500).
+    const groups = [
+      [cols.categories, parsed.categories],
+      [cols.transactions, parsed.transactions],
+      [cols.savingsGoals, parsed.savingsGoals],
+      [cols.targets, parsed.targets],
+      [cols.recurring, parsed.recurringRules],
+      [cols.debts, parsed.debts],
+      [cols.subscriptions, parsed.subscriptions],
+      [cols.templates, parsed.templates],
+    ];
+    const commits = [];
+    let writes = batch();
+    let pending = 0;
+    const put = (ref, data) => {
+      writes.set(ref, data, { merge: true });
+      if (++pending === 450) {
+        commits.push(writes.commit());
+        writes = batch();
+        pending = 0;
       }
+    };
+    for (const [col, records] of groups) {
+      for (const r of records) put(doc(col, r.id), { ...r.data, createdAt: r.createdAt || serverTimestamp() });
     }
+    if (parsed.currencySymbol != null) put(doc(cols.settings, "preferences"), { currencySymbol: parsed.currencySymbol });
+    if (pending) commits.push(writes.commit());
 
-    // Import life targets
-    if (data.targets) {
-      for (const t of data.targets) {
-        if (!t.text) continue;
-        await addDoc(targetsCol, { text: t.text, age: t.age || 0, done: !!t.done, createdAt: serverTimestamp() });
-      }
-    }
-
-    // Import recurring
-    let recCount = 0;
-    if (data.recurringRules) {
-      for (const r of data.recurringRules) {
-        if (!r.categoryId) continue;
-        await addDoc(recCol, {
-          categoryId: r.categoryId, categoryName: r.categoryName || "", type: r.type || "expense",
-          amount: r.amount || 0, note: r.note || "", dayOfMonth: r.dayOfMonth || 1, createdAt: serverTimestamp(),
-        });
-        recCount++;
-      }
-    }
-
-    // Import debts
-    let debtCount = 0;
-    if (data.debts) {
-      for (const d of data.debts) {
-        if (!d.person || !d.amount) continue;
-        await addDoc(debtsCol, {
-          person: d.person, direction: d.direction === "i_owe" ? "i_owe" : "owed_to_me",
-          amount: d.amount, note: d.note || "", dateISO: d.dateISO || todayISO(),
-          dueDate: d.dueDate || "", status: d.status === "settled" ? "settled" : "outstanding",
-          createdAt: serverTimestamp(),
-        });
-        debtCount++;
-      }
-    }
-
-    // Import subscriptions
-    let subCount = 0;
-    if (data.subscriptions) {
-      for (const s of data.subscriptions) {
-        if (!s.name || !s.amount) continue;
-        await addDoc(subsCol, {
-          name: s.name, categoryId: s.categoryId || "", categoryName: s.categoryName || "",
-          amount: s.amount, cycle: s.cycle === "year" ? "year" : "month",
-          nextRenewal: s.nextRenewal || todayISO(),
-          status: s.status === "cancelled" ? "cancelled" : "active",
-          createdAt: serverTimestamp(),
-        });
-        subCount++;
-      }
-    }
-
-    // Import settings
-    if (data.settings && data.settings.currencySymbol != null) {
-      await setDoc(doc(settingsCol, "preferences"), { currencySymbol: data.settings.currencySymbol }, { merge: true });
-    }
-
-    if (statusEl) statusEl.innerHTML = `${icon("check", "icon-sm")} ${t("Imported {categories} categories, {transactions} transactions, {goals} goals, {recurring} recurring rules, {debts} debts, {subscriptions} subscriptions.", { categories: catCount, transactions: txCount, goals: goalCount, recurring: recCount, debts: debtCount, subscriptions: subCount })}`;
+    let message = t("Imported {categories} categories, {transactions} transactions, {goals} goals, {recurring} recurring rules, {debts} debts, {subscriptions} subscriptions.", {
+      categories: parsed.categories.length,
+      transactions: parsed.transactions.length,
+      goals: parsed.savingsGoals.length,
+      recurring: parsed.recurringRules.length,
+      debts: parsed.debts.length,
+      subscriptions: parsed.subscriptions.length,
+    });
+    if (parsed.skipped) message += " " + t("Skipped {n} invalid entries.", { n: parsed.skipped });
+    // The app already shows the imported data (local copy); offline, the
+    // commits complete once the connection is back.
+    setStatus("check", message);
+    Promise.all(commits).catch((err) => setStatus("x-circle", t("Import failed: {message}", { message: friendlyDbError(err) })));
   } catch (err) {
-    if (statusEl) statusEl.innerHTML = `${icon("x-circle", "icon-sm")} ${t("Import failed: {message}", { message: escapeHtml(err.message || t("Unknown error")) })}`;
+    setStatus("x-circle", t("Import failed: {message}", { message: err?.message || t("Unknown error") }));
   }
 }
 
@@ -4531,17 +4601,23 @@ function wireEvents() {
             backup = snap.exists() ? { id: snap.id, ...snap.data() } : null;
           }
 
-          await deleteTransactionById(id);
+          deleteTransactionById(id);
 
+          const ownerUid = uid;
           if (backup) {
             const dataToRestore = stripUndefined({ ...backup });
             delete dataToRestore.id;
             showUndoToast({
               message: t("Record deleted. Undo?"),
               onUndo: async () => {
-                await setDoc(docRef, dataToRestore);
+                // Same id, so the photos (not deleted yet) belong to it again.
+                forgetReceiptPurge(ownerUid, id);
+                setDoc(docRef, dataToRestore).catch((err) => setAppError(friendlyDbError(err)));
               },
+              onExpire: () => purgeReceipts(ownerUid, id),
             });
+          } else {
+            purgeReceipts(ownerUid, id);
           }
         } catch (err) {
           setAppError(friendlyDbError(err));
@@ -5237,24 +5313,56 @@ function applyLanguage(lang) {
   }
 }
 
+// Date fields start as "today" / "this month". Called again when the app
+// returns to the foreground: a field still holding the previous default moves
+// to the new day, while a date the user picked stays. Returns true when the
+// day changed since the last call.
+let filledDay = "";
+let filledMonth = "";
+function fillDefaultDates() {
+  const day = todayISO();
+  const month = currentMonthValue();
+  const moveDay = (el) => { if (el && (!filledDay || el.value === filledDay)) el.value = day; };
+  const moveMonth = (el) => { if (el && (!filledMonth || el.value === filledMonth)) el.value = month; };
+  moveDay(els.txDate);
+  moveDay(els.statsAnchorDate);
+  moveMonth(els.statsMonth);
+  moveMonth(els.budgetMonth);
+  const changed = filledDay !== "" && filledDay !== day;
+  filledDay = day;
+  filledMonth = month;
+  return changed;
+}
+
 async function main() {
   initLang();
   translateDom();
   updateLangToggle();
   initTheme();
 
-  els.txDate.value = todayISO();
-  els.statsAnchorDate.value = todayISO();
-  els.statsMonth.value = currentMonthValue();
+  fillDefaultDates();
   setStatsInputVisibility();
   ensureStatsYearOptions();
 
-  els.budgetMonth.value = currentMonthValue();
   renderBudgetScopeLabel();
   updateCategoryBudgetHint();
 
   wireEvents();
   wireAssistantEvents();
+
+  // An iPhone home-screen app is usually resumed rather than reloaded, so catch
+  // up when it comes back: move stale default dates to the new day and record
+  // recurring transactions that came due meanwhile.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible") return;
+    if (fillDefaultDates()) {
+      renderBudgetScopeLabel();
+      updateCategoryBudgetHint();
+      if (uid) renderAll();
+    }
+    recurring.autoRun({ force: true });
+  });
+  window.addEventListener("online", () => recurring.autoRun({ force: true }));
 
   const init = await initFirebase();
   if (!init.ok) {

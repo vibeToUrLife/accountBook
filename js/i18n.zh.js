@@ -551,6 +551,9 @@ export const zh = {
   "Importing…": "正在导入…",
   "Imported {categories} categories, {transactions} transactions, {goals} goals, {recurring} recurring rules, {debts} debts, {subscriptions} subscriptions.": "已导入 {categories} 个分类、{transactions} 条记录、{goals} 个目标、{recurring} 条定期规则、{debts} 笔借贷、{subscriptions} 个订阅。",
   "Import failed: {message}": "导入失败：{message}",
+  "Restore this backup? Its records replace the same records in your account; nothing else is deleted.": "要恢复这个备份吗？文件中的记录会替换账户里相同的记录，其他数据不会被删除。",
+  "Skipped {n} invalid entries.": "已跳过 {n} 条无效记录。",
+  "Restore": "恢复",
   "No transactions found for {month}": "{month} 没有记录",
   "Report {month}": "{month} 报表",
   "Account Book — Monthly Report": "记账本月度报表",
@@ -612,6 +615,7 @@ export const zh = {
   "No recurring transactions due today (day {day}).": "今天（{day} 号）没有到期的定期交易。",
   "Added {n} recurring transaction(s).": "已添加 {n} 笔定期交易。",
   "All due recurring transactions already recorded today.": "今天到期的定期交易都已记录。",
+  "All recurring transactions are recorded up to today.": "所有定期交易都已记录到今天。",
 
   // ── Debts ──
   "Owed to me": "别人欠我",

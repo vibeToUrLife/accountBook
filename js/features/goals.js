@@ -1,6 +1,6 @@
 // Savings Goals feature module. Progress comes from the goal's own
 // contributions (deposits minus withdrawals), stored on the goal document.
-import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
 export function createGoals(ctx) {
   const { money, icon, escapeHtml, todayISO, normalizeText, parsePositiveAmount, showUndoToast, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, setDoc, doc, serverTimestamp } = firestore;
@@ -187,7 +187,8 @@ function signedAmount(c) {
 
 export function goalSaved(goal) {
   const total = contributionsOf(goal).reduce((sum, c) => sum + signedAmount(c), 0);
-  return Math.max(0, total);
+  // Round to cents: 10.10 + 10.20 + 9.70 adds up to 29.999999999999996.
+  return Math.max(0, Math.round(total * 100) / 100);
 }
 
 export function goalProgress(goal) {
@@ -208,8 +209,10 @@ function monthsUntil(todayISO, deadlineISO) {
   if (b <= a) return 0;
   let whole = (b.getFullYear() - a.getFullYear()) * 12 + (b.getMonth() - a.getMonth());
   if (b.getDate() < a.getDate()) whole -= 1;
-  const anchor = new Date(a);
-  anchor.setMonth(anchor.getMonth() + whole);
+  // Same day `whole` months later, or that month's last day (Oct 31 + 1 → Nov 30,
+  // not Dec 1, which would make Oct 31 → Dec 1 count as a single month).
+  const anchor = new Date(a.getFullYear(), a.getMonth() + whole, 1);
+  anchor.setDate(Math.min(a.getDate(), new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0).getDate()));
   return whole + (b > anchor ? 1 : 0);
 }
 

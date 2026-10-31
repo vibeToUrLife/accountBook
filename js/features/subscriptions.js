@@ -1,22 +1,36 @@
 // Subscriptions feature module. Awareness tracker + "Pay & Record" (logs an
 // expense and rolls the renewal date forward one cycle). Receives the shared
 // `ctx` from the core; reads live state via ctx.* and writes through Firestore.
-import { t } from "../i18n.js?v=1"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+
+/**
+ * The renewal one cycle after `dateISO` (YYYY-MM-DD, local time). The day of
+ * month stays on `anchorDay`, the day the subscription renews on, and drops to
+ * the month's last day when the month is shorter: Jan 31 → Feb 28 → Mar 31.
+ */
+export function nextRenewalDate(dateISO, cycle, anchorDay) {
+  const [y, m, d] = String(dateISO).split("-").map(Number);
+  const day = anchorDay || d;
+  const next = new Date(y, m - 1 + (cycle === "year" ? 12 : 1), 1);
+  next.setDate(Math.min(day, new Date(next.getFullYear(), next.getMonth() + 1, 0).getDate()));
+  const mm = String(next.getMonth() + 1).padStart(2, "0");
+  const dd = String(next.getDate()).padStart(2, "0");
+  return `${next.getFullYear()}-${mm}-${dd}`;
+}
+
+/** Id of the expense recorded for one renewal, so paying it twice writes the same record. */
+export function subscriptionPaymentId(subId, renewalISO) {
+  return `sub_${subId}_${renewalISO}`;
+}
+
 export function createSubscriptions(ctx) {
-  const { money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
-  const { addDoc, setDoc, deleteDoc, doc, serverTimestamp } = firestore;
+  const { money, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore, setAppError, friendlyDbError } = ctx;
+  const { addDoc, setDoc, deleteDoc, doc, serverTimestamp, batch } = firestore;
 
   function daysBetween(fromISO, toISO) {
     const a = new Date(fromISO + "T00:00:00");
     const b = new Date(toISO + "T00:00:00");
     return Math.round((b - a) / 86400000);
-  }
-
-  function advanceRenewal(dateISO, cycle) {
-    const d = new Date((dateISO || todayISO()) + "T00:00:00");
-    if (cycle === "year") d.setFullYear(d.getFullYear() + 1);
-    else d.setMonth(d.getMonth() + 1);
-    return d.toISOString().slice(0, 10);
   }
 
   function renderSubscriptions() {
@@ -117,6 +131,7 @@ export function createSubscriptions(ctx) {
     const { subscriptions: subsCol } = userCollections(ctx.uid);
     await addDoc(subsCol, {
       name, categoryId, categoryName, amount, cycle, nextRenewal,
+      renewalDay: Number(nextRenewal.slice(8, 10)) || 1, // keeps Jan 31 → Feb 28 → Mar 31
       status: "active", createdAt: serverTimestamp(),
     });
 
@@ -135,9 +150,16 @@ export function createSubscriptions(ctx) {
     const category = ctx.categories.find((c) => c.id === sub.categoryId);
     const categoryName = category ? category.name : (sub.categoryName || "(Unknown)");
     const note = t("{name} subscription", { name: sub.name });
+    const today = todayISO();
+    const renewal = sub.nextRenewal || today;
+    const renewalDay = Number(sub.renewalDay) || Number(renewal.slice(8, 10));
 
+    // The expense and the new renewal date are written together. The expense id
+    // comes from the renewal being paid, so a second tap (before the screen
+    // updates) rewrites the same record instead of adding another one.
     const { transactions: txCol, subscriptions: subsCol } = userCollections(ctx.uid);
-    await addDoc(txCol, {
+    const writes = batch();
+    writes.set(doc(txCol, subscriptionPaymentId(subId, renewal)), {
       categoryId: sub.categoryId,
       categoryName,
       type: "expense",
@@ -145,12 +167,17 @@ export function createSubscriptions(ctx) {
       note,
       noteLower: note.toLowerCase(),
       tags: [],
-      dateISO: todayISO(),
+      dateISO: today,
       createdAt: serverTimestamp(),
     });
-
-    const nextRenewal = advanceRenewal(sub.nextRenewal, sub.cycle);
-    await setDoc(doc(subsCol, subId), { nextRenewal, lastPaidISO: todayISO() }, { merge: true });
+    writes.set(doc(subsCol, subId), {
+      nextRenewal: nextRenewalDate(renewal, sub.cycle, renewalDay),
+      renewalDay,
+      lastPaidISO: today,
+    }, { merge: true });
+    // Not awaited: offline, the commit only settles once the server has it, but
+    // the screen updates right away from the local copy.
+    writes.commit().catch((err) => setAppError(friendlyDbError(err)));
   }
 
   async function cancelSubscription(subId) {

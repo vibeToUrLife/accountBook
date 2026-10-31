@@ -29,6 +29,8 @@ import {
   orderBy,
   query,
   serverTimestamp,
+  writeBatch,
+  runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 let firebaseConfig = null;
@@ -173,5 +175,8 @@ export function firestoreApi() {
     orderBy,
     query,
     serverTimestamp,
+    // Bound to the app's database when called (firestoreApi() runs before initFirebase).
+    batch: () => writeBatch(db),
+    runTransaction: (fn) => runTransaction(db, fn),
   };
 }
