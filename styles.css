@@ -698,7 +698,7 @@ input:focus, select:focus, textarea:focus {
   bottom: 16px;
   transform: translateX(-50%);
   width: min(440px, calc(100% - 32px));
-  z-index: 20;
+  z-index: 55; /* above the floating buttons (50) while it's showing, below the assistant panel (60) */
   box-shadow: var(--shadow-lg);
   background: var(--surface);
   border-color: var(--warning-border);
@@ -1735,4 +1735,48 @@ input:focus, select:focus, textarea:focus {
   .stats-controls .field.inline-sm input,
   .stats-controls .field.inline-sm select,
   .target-edit-input { font-size: 16px; }
+}
+
+/* ============================================================
+   ADD RECORD: inline errors + action row
+   ============================================================ */
+.form-error { color: var(--danger); font-weight: 600; }
+
+/* Phones: the action row sticks to the bottom of the screen so Record is
+   always in reach; Save as Template / Scan Receipt shrink to icons beside it.
+   The "+" button is hidden on this screen (it only covered Record) and the
+   assistant button moves up above the bar. */
+@media (max-width: 979px) {
+  #txForm > .row.wrap.tx-actions {
+    position: sticky;
+    bottom: 0;
+    z-index: 4;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 8px;
+    margin: 4px -14px -16px;
+    padding: 10px 14px calc(10px + env(safe-area-inset-bottom, 0px));
+    background: var(--card);
+    border-top: 1px solid var(--border);
+    border-radius: 0 0 14px 14px;
+  }
+  #txForm > .row.wrap.tx-actions .btn { width: auto; flex: 1; }
+  #txForm > .row.wrap.tx-actions #saveTemplateBtn,
+  #txForm > .row.wrap.tx-actions #scanReceiptBtn { flex: none; width: 48px; padding: 0; }
+  #txForm > .row.wrap.tx-actions .btn-label { display: none; }
+  body[data-view="record"] .quick-add-fab { display: none; }
+  body[data-view="record"] .assistant-fab { bottom: calc(82px + env(safe-area-inset-bottom, 0px)); }
+}
+
+/* Chinese interface: hidden until js/boot.js has translated it (see the
+   <head> script), so it doesn't flash English first. */
+html.i18n-pending body { visibility: hidden; }
+
+/* With the assistant open (a bottom sheet on phones, a box at the bottom
+   right on wider screens), the Undo toast moves to the top of the screen so it
+   isn't hidden behind the panel. */
+body:has(#assistantPanel:not([hidden])) #undoToast {
+  top: calc(env(safe-area-inset-top, 0px) + 72px);
+  bottom: auto;
+  z-index: 70;
 }

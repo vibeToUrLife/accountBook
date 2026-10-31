@@ -92,6 +92,8 @@ Pure logic (upcoming-items date math, recurring catch-up, subscription renewal d
 - `utils.js` — shared helpers
 - `js/i18n.js` / `js/i18n.zh.js` — translation layer and the Simplified Chinese dictionary (English text is the key)
 - `js/backup.js` — reads backup files for import (validates every field, keeps record ids)
+- `js/boot.js` — applies the saved language before the rest of the app (and the Firebase SDK) has loaded
+- `vendor/chart.umd.js` — Chart.js 4.4.1 (MIT, unmodified), served from the site and loaded when Statistics or Dashboard opens
 - `js/features/` — feature modules (goals, upcoming, recurring, debts, subscriptions, templates, receipts)
 - `tests/` — unit tests for the pure feature logic
 - `styles.css` — styling (light/dark theme)

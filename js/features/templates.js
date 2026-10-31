@@ -58,10 +58,24 @@ export function createTemplates(ctx) {
     });
   }
 
+  // A template with an amount is recorded in one tap (the "Saved" toast offers
+  // Undo), on the date in the form. One without an amount fills the form so the
+  // amount can be typed.
   function applyTemplate(id) {
     const t = ctx.templates.find((x) => x.id === id);
     if (!t) return;
-    if (t.categoryId && ctx.categories.some((c) => c.id === t.categoryId)) {
+    const hasCategory = t.categoryId && ctx.categories.some((c) => c.id === t.categoryId);
+    if (hasCategory && t.amount > 0) {
+      ctx.saveTransaction({
+        categoryId: t.categoryId,
+        type: t.type === "revenue" ? "revenue" : "expense",
+        amount: t.amount,
+        note: t.note || "",
+        dateISO: els.txDate.value || todayISO(),
+      });
+      return;
+    }
+    if (hasCategory) {
       els.txCategory.value = t.categoryId;
     }
     els.txType.value = t.type === "revenue" ? "revenue" : "expense";

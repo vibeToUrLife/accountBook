@@ -340,7 +340,7 @@ export const zh = {
   "Quick add record (N)": "快速记一笔（N）",
   "Quick add record": "快速记一笔",
   "e.g. 今天吃鸡饭18块 / spent 50 on fuel": "例如：今天吃鸡饭18块 / spent 50 on fuel",
-  "Hold to speak": "按住说话",
+  "Tap to speak": "点一下说话",
   "Send": "发送",
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -554,6 +554,8 @@ export const zh = {
   "Restore this backup? Its records replace the same records in your account; nothing else is deleted.": "要恢复这个备份吗？文件中的记录会替换账户里相同的记录，其他数据不会被删除。",
   "Skipped {n} invalid entries.": "已跳过 {n} 条无效记录。",
   "Restore": "恢复",
+  "Saved {amount} · {category}": "已记录 {amount} · {category}",
+  "Saved {n} records.": "已记录 {n} 笔。",
   "No transactions found for {month}": "{month} 没有记录",
   "Report {month}": "{month} 报表",
   "Account Book — Monthly Report": "记账本月度报表",

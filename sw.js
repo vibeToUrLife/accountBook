@@ -1,30 +1,31 @@
-const CACHE_NAME = "accountbook-v19";
+const CACHE_NAME = "accountbook-v20";
 const CDN_CACHE = "accountbook-cdn-v16";
 // The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
 // /index.html with a 308 to /, and a page load can't be answered with a cached
 // redirect (Safari: "Response served by service worker has redirections").
 const SHELL = "./";
 // How long a page load waits for the network before using the cached shell.
-const NAV_TIMEOUT_MS = 3000;
+const NAV_TIMEOUT_MS = 1500;
 // Versioned like the imports in app.js, so a cached copy never mixes with
 // files from another release.
 const PRECACHE = [
   SHELL,
-  "./styles.css?v=14",
-  "./app.js?v=13",
+  "./styles.css?v=15",
+  "./app.js?v=14",
+  "./js/boot.js?v=1",
   "./utils.js?v=7",
   "./firebase.js?v=2",
   "./firebase-config.js",
   "./js/i18n.js?v=2",
-  "./js/i18n.zh.js?v=2",
+  "./js/i18n.zh.js?v=3",
   "./js/backup.js?v=1",
   "./js/features/debts.js?v=2",
   "./js/features/goals.js?v=3",
-  "./js/features/receipts.js?v=2",
+  "./js/features/receipts.js?v=3",
   "./js/features/recurring.js?v=2",
   "./js/features/subscriptions.js?v=2",
   "./js/features/targets.js?v=2",
-  "./js/features/templates.js?v=2",
+  "./js/features/templates.js?v=3",
   "./js/features/upcoming.js?v=2",
   "./favicon.svg?v=2",
 ];
@@ -127,3 +128,14 @@ async function handleNavigation(request) {
   }
   return (await cache.match(SHELL)) || network;
 }
+
+// Tapping a budget alert opens the app (or brings it to the front).
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => "focus" in w);
+      return open ? open.focus() : self.clients.openWindow("./");
+    })
+  );
+});

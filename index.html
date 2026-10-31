@@ -15,10 +15,38 @@
     <!-- The page draws under the iOS status bar; styles.css reserves that space
          with env(safe-area-inset-top) above the header. -->
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <script>
+      // Before the first paint (app.js arrives later): apply the saved theme, and
+      // when the language is Chinese hide the page until js/boot.js has translated
+      // it, so it doesn't flash light / English first. The timer is a safety net.
+      (function () {
+        var root = document.documentElement;
+        try {
+          var theme = localStorage.getItem("accountBook.theme");
+          if (theme !== "dark" && theme !== "light") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+          root.dataset.theme = theme;
+          var meta = document.querySelector('meta[name="theme-color"]');
+          if (meta) meta.content = theme === "dark" ? "#121826" : "#ffffff";
+          var lang = localStorage.getItem("accountBook.lang");
+          if (lang !== "zh" && lang !== "en") lang = /^zh\b/i.test(navigator.language || "") ? "zh" : "en";
+          if (lang === "zh") {
+            root.lang = "zh-CN";
+            root.classList.add("i18n-pending");
+            setTimeout(function () { root.classList.remove("i18n-pending"); }, 2500);
+          }
+        } catch (e) {}
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=14" />
+    <link rel="stylesheet" href="./styles.css?v=15" />
+    <!-- Start downloading the Firebase SDK right away; otherwise it is only found
+         after app.js and firebase.js have been fetched and parsed. -->
+    <link rel="modulepreload" href="./firebase.js?v=2" />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" />
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js" />
   </head>
   <body>
     <!-- SVG icon sprite (Lucide-style). Referenced via <svg class="icon"><use href="#i-NAME"></use></svg> -->
@@ -285,11 +313,14 @@
               </div>
             </label>
 
-            <div class="row wrap">
+            <div id="txFormError" class="form-error small" role="alert" hidden></div>
+
+            <!-- On phones this row sticks to the bottom of the screen, so Record is always in reach. -->
+            <div class="row wrap tx-actions">
               <button data-i18n id="txSubmitBtn" class="btn" type="submit">Record</button>
               <button data-i18n id="cancelTxEdit" class="btn btn-secondary" type="button" hidden>Cancel</button>
-              <button data-i18n id="saveTemplateBtn" class="btn btn-secondary" type="button" title="Save current form as a quick template"><svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg>Save as Template</button>
-              <button data-i18n id="scanReceiptBtn" class="btn btn-secondary" type="button" title="Scan a receipt with camera"><svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg>Scan Receipt</button>
+              <button id="saveTemplateBtn" class="btn btn-secondary" type="button" title="Save current form as a quick template" aria-label="Save as Template"><svg class="icon" aria-hidden="true"><use href="#i-star"></use></svg><span data-i18n class="btn-label">Save as Template</span></button>
+              <button id="scanReceiptBtn" class="btn btn-secondary" type="button" title="Scan a receipt with camera" aria-label="Scan Receipt"><svg class="icon" aria-hidden="true"><use href="#i-camera"></use></svg><span data-i18n class="btn-label">Scan Receipt</span></button>
             </div>
           </form>
         </section>
@@ -1265,12 +1296,13 @@
       <div id="assistantChat" class="assistant-chat"></div>
       <div class="assistant-input-row">
         <input id="assistantInput" type="text" placeholder="e.g. 今天吃鸡饭18块 / spent 50 on fuel" autocomplete="off" />
-        <button id="assistantMicBtn" class="btn assistant-mic" type="button" title="Hold to speak"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></button>
+        <button id="assistantMicBtn" class="btn assistant-mic" type="button" title="Tap to speak" aria-label="Tap to speak"><svg class="icon" aria-hidden="true"><use href="#i-mic"></use></svg></button>
         <button id="assistantSendBtn" class="btn" type="button" title="Send"><svg class="icon" aria-hidden="true"><use href="#i-send"></use></svg></button>
       </div>
     </div>
 
-    <script type="module" src="./app.js?v=13"></script>
+    <script type="module" src="./js/boot.js?v=1"></script>
+    <script type="module" src="./app.js?v=14"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

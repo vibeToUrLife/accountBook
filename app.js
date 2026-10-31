@@ -32,8 +32,8 @@ import { createDebts } from "./js/features/debts.js?v=2";
 import { createSubscriptions } from "./js/features/subscriptions.js?v=2";
 import { createGoals } from "./js/features/goals.js?v=3";
 import { createTargets } from "./js/features/targets.js?v=2";
-import { createTemplates } from "./js/features/templates.js?v=2";
-import { createReceipts } from "./js/features/receipts.js?v=2";
+import { createTemplates } from "./js/features/templates.js?v=3";
+import { createReceipts } from "./js/features/receipts.js?v=3";
 import { createRecurring } from "./js/features/recurring.js?v=2";
 import { createUpcoming } from "./js/features/upcoming.js?v=2";
 import { t, initLang, getLang, setLang, translateDom, locale } from "./js/i18n.js?v=2";
@@ -57,6 +57,7 @@ const {
 
 const els = {
   authStatus: document.getElementById("authStatus"),
+  txFormError: document.getElementById("txFormError"),
   sidebarAccount: document.getElementById("sidebarAccount"),
   themeToggleBtn: document.getElementById("themeToggleBtn"),
   signOutBtn: document.getElementById("signOutBtn"),
@@ -211,11 +212,12 @@ const els = {
 };
 
 let ChartJs = null;
-let ChartJsRegistered = false;
 let statsChartInstance = null;
 let editingCategoryId = null;
 let editingTransactionId = null;
-let lastUsedCategoryId = null;
+let lastUsedCategoryId = (() => {
+  try { return localStorage.getItem("accountBook.lastCategory"); } catch { return null; }
+})();
 let openBudgetRecordsCategoryId = "";
 let budgetRecordsPage = 1;
 let budgetRecordsSearchTerm = "";
@@ -242,42 +244,45 @@ let unsubSubscriptions = null;
 let budgetAlertsEnabled = localStorage.getItem("accountBook.budgetAlerts") === "on";
 const _notifiedBudgets = new Set();
 
-async function ensureChartJs() {
-  if (ChartJs) return ChartJs;
+// Chart.js 4.4.1 (UMD build, MIT licence, unmodified from npm) is served from
+// this site, so charts don't depend on a CDN and work offline once the service
+// worker has the file. It is loaded the first time Statistics or Dashboard opens.
+const CHART_JS_URL = "./vendor/chart.umd.js?v=4.4.1";
+let chartJsLoading = null;
 
-  // Prefer global Chart if available (e.g. UMD build loaded via <script>).
-  if (typeof globalThis !== "undefined" && globalThis.Chart) {
-    ChartJs = globalThis.Chart;
-    return ChartJs;
-  }
+function loadClassicScript(src) {
+  return new Promise((resolve, reject) => {
+    const el = document.createElement("script");
+    el.src = src;
+    el.async = true;
+    el.onload = () => resolve();
+    el.onerror = () => { el.remove(); reject(new Error(`Failed to load ${src}`)); };
+    document.head.appendChild(el);
+  });
+}
 
-  const urls = [
-    // Chart.js ESM build (requires registering components)
-    "https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.js",
-    // ESM CDN fallback
-    "https://esm.sh/chart.js@4.4.1",
-  ];
-
-  let lastError = null;
-  for (const url of urls) {
-    try {
-      const mod = await import(url);
-      const Chart = mod.Chart || mod.default;
-      if (!Chart) continue;
-      ChartJs = Chart;
-
-      if (!ChartJsRegistered && mod.registerables && typeof Chart.register === "function") {
-        Chart.register(...mod.registerables);
-        ChartJsRegistered = true;
+function ensureChartJs() {
+  if (ChartJs) return Promise.resolve(ChartJs);
+  if (!chartJsLoading) {
+    chartJsLoading = (async () => {
+      if (!globalThis.Chart) {
+        try {
+          await loadClassicScript(CHART_JS_URL);
+        } catch {
+          // Same version from a CDN as a last resort (ES module build).
+          const mod = await import("https://esm.sh/chart.js@4.4.1");
+          const Chart = mod.Chart || mod.default;
+          if (mod.registerables && typeof Chart?.register === "function") Chart.register(...mod.registerables);
+          return (ChartJs = Chart);
+        }
       }
-
-      return ChartJs;
-    } catch (e) {
-      lastError = e;
-    }
+      return (ChartJs = globalThis.Chart); // the UMD build registers all chart types itself
+    })().catch((err) => {
+      chartJsLoading = null; // allow a retry next time
+      throw err;
+    });
   }
-
-  throw lastError || new Error("Failed to load Chart.js");
+  return chartJsLoading;
 }
 
 function setStatsChartMessage(message) {
@@ -792,6 +797,7 @@ const ctx = {
   setAppError,
   friendlyDbError,
   showUndoToast,
+  saveTransaction,
   userCollections,
   firestore: { collection, addDoc, deleteDoc, doc, getDoc, getDocs, setDoc, onSnapshot, orderBy, query, serverTimestamp, batch, runTransaction },
   get refresh() { return renderAll; },
@@ -1322,7 +1328,10 @@ function renderTransactionsTable() {
   }
 }
 
+// Statistics (and its chart, which needs Chart.js) is drawn only while it is
+// on screen; switching to it draws it with the latest data.
 function renderStats() {
+  if (document.body.dataset.view !== "stats") return;
   const range = els.statsRange.value;
   const { start, endExclusive } = rangeForUi(range);
 
@@ -1398,7 +1407,9 @@ let renderAllPending = false;
 function renderAll() {
   if (renderAllPending) return;
   renderAllPending = true;
-  queueMicrotask(() => {
+  // One redraw per frame: at launch the settings, categories and records
+  // listeners report separately, a few milliseconds apart.
+  requestAnimationFrame(() => {
     renderAllPending = false;
     renderCategorySelect();
     renderFilterCategoryOptions();
@@ -1752,26 +1763,49 @@ async function deleteCategoryById(categoryId) {
   await deleteDoc(doc(categoriesCol, categoryId));
 }
 
-async function addTransaction() {
-  const categoryId = els.txCategory.value;
-  const type = els.txType.value;
-  const amount = parsePositiveAmount(els.txAmount.value);
-  const note = normalizeText(els.txNote.value);
-  const tags = parseTags(els.txTags ? els.txTags.value : "");
-  const dateISO = els.txDate.value;
+// Remembered across launches so the form opens on the category used last.
+const LAST_CATEGORY_KEY = "accountBook.lastCategory";
+function rememberCategory(categoryId) {
+  lastUsedCategoryId = categoryId;
+  try { localStorage.setItem(LAST_CATEGORY_KEY, categoryId); } catch { /* storage blocked */ }
+}
 
-  if (!categoryId) return;
-  if (type !== "expense" && type !== "revenue") return;
-  if (amount == null) return;
-  if (!dateISO) return;
+// Problems with the Add Record form show next to its buttons, where the user
+// is looking (the page-level error line is off-screen on a phone).
+function showFormError(message) {
+  if (!els.txFormError) {
+    if (message) setAppError(message);
+    return;
+  }
+  els.txFormError.textContent = message || "";
+  els.txFormError.hidden = !message;
+}
 
+// Remove records just added (Undo on the "Saved" toast).
+function undoNewRecords(refs) {
+  const writes = batch();
+  for (const ref of refs) writes.delete(ref);
+  writes.commit().catch((err) => setAppError(friendlyDbError(err)));
+}
+
+/**
+ * Write a new record (and its photos) without waiting for the server. Offline,
+ * the write is queued and the app shows the record from its local copy right
+ * away, so the form is ready for the next one. Unless `toast: false`, shows
+ * "Saved … · Undo". Returns the new record's document reference.
+ */
+function saveTransaction({ categoryId, type, amount, note = "", tags = [], dateISO, photos = [], toast = true }) {
   const category = categories.find((c) => c.id === categoryId);
   const categoryName = category ? category.name : "(Unknown)";
-
   const { transactions: txCol } = userCollections(uid);
+  const ref = doc(txCol);
+  const photoRefs = photos.map(() => doc(receipts.receiptsCol(ref.id)));
 
-  const queuedCount = receipts.pendingCount();
-  const ref = await addDoc(txCol, {
+  // Photos go 8 per commit (each is a compressed JPEG of at most a few hundred
+  // KB), keeping every commit well under Firestore's request size limit.
+  const commits = [];
+  let writes = batch();
+  writes.set(ref, {
     categoryId,
     categoryName,
     type,
@@ -1780,13 +1814,48 @@ async function addTransaction() {
     noteLower: note.toLowerCase(),
     tags,
     dateISO,
-    receiptCount: queuedCount,
+    receiptCount: photos.length,
     createdAt: serverTimestamp(),
   });
+  photos.forEach((dataUrl, i) => {
+    if (i > 0 && i % 8 === 0) {
+      commits.push(writes.commit());
+      writes = batch();
+    }
+    writes.set(photoRefs[i], { dataUrl, createdAt: serverTimestamp() });
+  });
+  commits.push(writes.commit());
+  Promise.all(commits).catch((err) => setAppError(friendlyDbError(err)));
 
-  await receipts.flushPendingTo(ref.id);
+  rememberCategory(categoryId);
+  if (toast) {
+    showUndoToast({
+      message: t("Saved {amount} · {category}", { amount: money(amount), category: categoryName }),
+      onUndo: async () => undoNewRecords([...photoRefs, ref]),
+    });
+  }
+  return ref;
+}
 
-  lastUsedCategoryId = categoryId;
+function addTransaction() {
+  const categoryId = els.txCategory.value;
+  const type = els.txType.value;
+  const amount = parsePositiveAmount(els.txAmount.value);
+  const note = normalizeText(els.txNote.value);
+  const tags = parseTags(els.txTags ? els.txTags.value : "");
+  const dateISO = els.txDate.value;
+
+  if (!categoryId) return showFormError(t("Add a category first"));
+  if (type !== "expense" && type !== "revenue") return;
+  if (amount == null) {
+    showFormError(t("Enter an amount greater than 0."));
+    els.txAmount.focus();
+    return;
+  }
+  if (!dateISO) return showFormError(t("Pick a date."));
+
+  saveTransaction({ categoryId, type, amount, note, tags, dateISO, photos: receipts.takePending() });
+
   if (els.txAmount._bankPrefill) els.txAmount._bankPrefill(0);
   else els.txAmount.value = "";
   els.txNote.value = "";
@@ -1813,7 +1882,8 @@ async function updateTransaction() {
   const categoryName = category ? category.name : "(Unknown)";
   const { transactions: txCol } = userCollections(uid);
 
-  await setDoc(doc(txCol, editingTransactionId), {
+  // Not awaited: offline, a write only settles once the server has it.
+  setDoc(doc(txCol, editingTransactionId), {
     categoryId,
     categoryName,
     type,
@@ -1823,7 +1893,7 @@ async function updateTransaction() {
     tags,
     dateISO,
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  }, { merge: true }).catch((err) => setAppError(friendlyDbError(err)));
 
   cancelTxEdit();
   txPage = 1;
@@ -2253,13 +2323,16 @@ function parseChinese(text) {
   let result = 0;
   let current = 0;
   let lastUnit = 1;
+  let zeroAfterUnit = false; // "一百零五": the 零 makes the 五 a plain 5, not 50
 
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (digits[ch] !== undefined) {
       current = digits[ch];
+      if (digits[ch] === 0) zeroAfterUnit = true;
     } else if (units[ch] !== undefined) {
       const u = units[ch];
+      zeroAfterUnit = false;
       if (u >= 10000) {
         result = (result + (current || 1)) * u;
         current = 0;
@@ -2275,7 +2348,7 @@ function parseChinese(text) {
 
   // Trailing digit shorthand: "两百五" → current=5, lastUnit=100 → 5 * 10 = 50
   if (current > 0) {
-    if (lastUnit >= 100 && current < 10) {
+    if (lastUnit >= 100 && current < 10 && !zeroAfterUnit) {
       result += current * (lastUnit / 10);
     } else {
       result += current;
@@ -2285,7 +2358,32 @@ function parseChinese(text) {
   return result || NaN;
 }
 
+// "1,200" → "1200": a comma between digits is a thousands separator, not a
+// break between two items ("lunch 12, coffee 5" keeps its comma).
+function joinThousands(text) {
+  return String(text || "").replace(/(\d),(?=\d{3}(?!\d))/g, "$1");
+}
+
+// Dates written in a message ("3月5日", "3/5", "2026-03-05"); taken out before
+// reading the amount so "3月5日 加油 50" isn't read as RM3.
+const DATE_TEXT_RE = /\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\s*月\s*\d{1,2}\s*[日号]?|\d{1,2}[/-]\d{1,2}(?![\d.])/g;
+
+// What a chat message says the money was for, in the user's own words: the
+// text without dates, amounts, currency words and filler ("today", "spent", 花了).
+function noteFromText(text) {
+  return String(text || "")
+    .replace(DATE_TEXT_RE, " ")
+    .replace(/(?:rm|myr|\$)\s*\d[\d.]*/gi, " ")
+    .replace(/\d+(?:\.\d+)?\s*(?:块钱|块|元|令吉|ringgit|dollars?|rm)?/gi, " ")
+    .replace(/[零〇一二两三四五六七八九十百千万亿]+\s*(?:块钱|块|元|令吉)/g, " ")
+    .replace(/今天|昨天|前天|今日|昨日|花了|用了|付了|\b(?:today|yesterday|spent|spend|paid|pay|on)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .replace(/^[\s,，.。!！?？;；:：、-]+|[\s,，.。!！?？;；:：、-]+$/g, "")
+    .slice(0, 80);
+}
+
 function extractAmount(text) {
+  text = joinThousands(text).replace(DATE_TEXT_RE, " ");
   // Try patterns: "18.5", "RM18.5", "$18.5", "18块5", "18.5块"
   const rmMatch = text.match(/(?:rm|RM|MYR|myr)\s*([\d,.]+)/);
   if (rmMatch) return parseFloat(rmMatch[1].replace(/,/g, ""));
@@ -2467,7 +2565,7 @@ function detectIntent(text) {
 
 // --- Parse multiple transactions from one sentence ---
 function parseMultipleTransactions(text) {
-  const raw = String(text || "").trim();
+  const raw = joinThousands(String(text || "").trim());
   if (!raw) return null;
 
   const base = detectIntent(raw);
@@ -2478,7 +2576,7 @@ function parseMultipleTransactions(text) {
   }
 
   // For add_expense/add_income, split on common delimiters and try to extract multiple items
-  const delimiters = /\s*(?:,|，|and|且|还有|以及|、|;|；)\s*/;
+  const delimiters = /\s*(?:,|，|\band\b|且|还有|以及|、|;|；)\s*/i;
   const segments = raw.split(delimiters).filter(s => s.trim());
 
   if (segments.length === 1) {
@@ -2517,7 +2615,7 @@ function parseNaturalInput(text) {
   const date = extractDate(raw);
   const month = base.month || extractMonth(raw);
 
-  const result = { ...base };
+  const result = { ...base, text: raw };
 
   if (amount != null && amount > 0) result.amount = Math.round(amount * 100) / 100;
   if (category) result.category = category;
@@ -2698,26 +2796,20 @@ async function executeAssistantIntent(parsed) {
     const categoryId = cat ? cat.id : categories[0].id;
     const categoryName = cat ? cat.name : categories[0].name;
     const dateISO = parsed.date || todayISO();
-    const note = parsed.item_name || parsed.category || "";
+    // The user's own words rather than a translation: "今天吃鸡饭18块" keeps
+    // "吃鸡饭", so searching 鸡饭 finds the record later.
+    const note = noteFromText(parsed.text || "");
 
-    const { transactions: txCol } = userCollections(uid);
-    await addDoc(txCol, {
-      categoryId,
-      categoryName,
-      type,
-      amount: parsed.amount,
-      note,
-      noteLower: note.toLowerCase(),
-      dateISO,
-      createdAt: serverTimestamp(),
-    });
-
-    lastUsedCategoryId = categoryId;
+    // The chat shows one "Saved … · Undo" toast for the whole message.
+    const ref = saveTransaction({ categoryId, type, amount: parsed.amount, note, dateISO, toast: false });
 
     const typeLabel = type === "expense" ? t("Expense") : t("Income");
     return {
       ok: true,
       type: "add",
+      ref,
+      amount: parsed.amount,
+      categoryName,
       message: t("{type} recorded!", { type: typeLabel }),
       detail: `${categoryName} · ${money(parsed.amount)} · ${dateISO}${note ? " · " + note : ""}`,
     };
@@ -2778,6 +2870,18 @@ function formatBatchAddResult(results, errors) {
   return html;
 }
 
+// One "Saved" toast for everything a chat message added; Undo removes them all.
+function offerUndoForAssistant(results) {
+  const added = results.filter((r) => r && r.ok && r.ref);
+  if (!added.length) return;
+  showUndoToast({
+    message: added.length === 1
+      ? t("Saved {amount} · {category}", { amount: money(added[0].amount), category: added[0].categoryName })
+      : t("Saved {n} records.", { n: added.length }),
+    onUndo: async () => undoNewRecords(added.map((r) => r.ref)),
+  });
+}
+
 async function handleAssistantMessage(text) {
   const raw = text.trim();
   if (!raw) return;
@@ -2822,6 +2926,7 @@ async function handleAssistantMessage(text) {
       }
 
       if (thinking) thinking.remove();
+      offerUndoForAssistant(results);
 
       if (results.length === 0 && errors.length > 0) {
         addChatBubble("bot", `<span>${icon("x-circle", "icon-sm")} ${escapeHtml(errors[0])}</span>`);
@@ -2850,6 +2955,7 @@ async function handleAssistantMessage(text) {
     if (result.type === "query") {
       addChatBubble("bot", formatQueryResult(result));
     } else if (result.type === "add") {
+      offerUndoForAssistant([result]);
       addChatBubble("bot", formatAddResult(result));
     }
   } catch (err) {
@@ -2869,8 +2975,7 @@ function initSpeechRecognition() {
   const rec = new SR();
   rec.continuous = false;
   rec.interimResults = false;
-  // Support Chinese + English mixed input
-  rec.lang = "zh-CN";
+  rec.lang = getLang() === "zh" ? "zh-CN" : "en-US";
 
   rec.onresult = (event) => {
     const transcript = event.results[0][0].transcript;
@@ -2904,6 +3009,8 @@ function startListening() {
     return;
   }
   try {
+    // Listen in the interface language (it may have changed since the first use).
+    speechRecognition.lang = getLang() === "zh" ? "zh-CN" : "en-US";
     speechRecognition.start();
     isListening = true;
     if (els.assistantMicBtn) els.assistantMicBtn.classList.add("listening");
@@ -3731,6 +3838,7 @@ function renderTrendCategoryPicker(options, selected) {
 }
 
 async function renderTrendChart() {
+  if (document.body.dataset.view !== "dashboard") return; // drawn when Dashboard opens
   const canvas = document.getElementById("trendChart");
   const msgEl = document.getElementById("trendChartMessage");
   if (!canvas) return;
@@ -3820,6 +3928,7 @@ function toggleTrendCategory(catId) {
 
 /* ─── Cashflow Chart (income vs expense, last 6 months) ─── */
 async function renderCashflowChart() {
+  if (document.body.dataset.view !== "dashboard") return; // drawn when Dashboard opens
   const canvas = document.getElementById("cashflowChart");
   const msgEl = document.getElementById("cashflowChartMessage");
   if (!canvas) return;
@@ -3962,9 +4071,17 @@ function notifyBudget(title, body, key) {
   if (typeof Notification === "undefined" || Notification.permission !== "granted") return;
   if (_notifiedBudgets.has(key)) return;
   _notifiedBudgets.add(key);
-  try {
-    new Notification(title, { body });
-  } catch (_) { /* ignore */ }
+  // An iPhone home-screen app can only show notifications through its service
+  // worker (new Notification() isn't supported there); browsers without a
+  // worker fall back to the page API.
+  const options = { body, tag: key, icon: "./icons/icon-192.png" };
+  const fallback = () => { try { new Notification(title, options); } catch { /* unsupported */ } };
+  const worker = navigator.serviceWorker && navigator.serviceWorker.getRegistration
+    ? navigator.serviceWorker.getRegistration()
+    : Promise.resolve(null);
+  worker
+    .then((reg) => (reg && typeof reg.showNotification === "function" ? reg.showNotification(title, options) : fallback()))
+    .catch(fallback);
 }
 
 async function toggleBudgetAlerts() {
@@ -4248,6 +4365,8 @@ function wireEvents() {
   }
 
   function switchView(viewName) {
+    // Lets CSS adapt to the screen (e.g. no "+" button on Add Record itself).
+    document.body.dataset.view = viewName;
     viewSections.forEach((s) => {
       s.classList.toggle("active", s.dataset.view === viewName);
     });
@@ -4265,6 +4384,9 @@ function wireEvents() {
     // Auto-generate insights when navigating to that view
     if (viewName === "insights") {
       generateInsights();
+    }
+    if (viewName === "stats") {
+      renderStats();
     }
     if (viewName === "dashboard") {
       renderDashboard();
@@ -4304,9 +4426,9 @@ function wireEvents() {
   /* -- Quick Add floating button + keyboard shortcuts -- */
   function jumpToAddRecord() {
     switchView("record");
-    // Focus the note field so the user can start typing immediately.
+    // Focus the amount so the user can start typing immediately.
     setTimeout(() => {
-      const field = els.txNote || els.txCategory;
+      const field = els.txAmount || els.txNote;
       if (field) field.focus();
     }, 120);
   }
@@ -4567,6 +4689,7 @@ function wireEvents() {
   els.txForm.addEventListener("submit", async (e) => {
     e.preventDefault();
     setAppError("");
+    showFormError("");
     await withDisabled([els.txSubmitBtn, els.cancelTxEdit], async () => {
       try {
         if (editingTransactionId) {

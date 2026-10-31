@@ -90,14 +90,15 @@ export function createReceipts(ctx) {
     return pendingReceipts.length;
   }
 
-  // Save the queued photos to a newly-created transaction, then reset the queue/input.
-  async function flushPendingTo(txId) {
+  // Hand the queued photos to the caller, which writes them together with the
+  // new record, and reset the queue/input.
+  function takePending() {
     const queued = pendingReceipts.slice();
-    if (queued.length) await saveReceiptsForTx(txId, queued);
     pendingReceipts = [];
     renderPendingReceipts();
     const input = document.getElementById("txReceiptInput");
     if (input) input.value = "";
+    return queued;
   }
 
   // Cascade-delete a transaction's receipt subcollection.
@@ -173,7 +174,7 @@ export function createReceipts(ctx) {
   }
 
   return {
-    queuePendingReceipts, removePendingAt, pendingCount, flushPendingTo, deleteAllForTx,
+    queuePendingReceipts, removePendingAt, pendingCount, takePending, receiptsCol, deleteAllForTx,
     openReceiptViewer, closeReceiptViewer, addReceiptsFromViewer, deleteReceiptFromViewer,
     openLightbox, closeLightbox,
   };
