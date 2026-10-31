@@ -99,24 +99,26 @@ Pure logic (upcoming-items date math, recurring catch-up, subscription renewal d
 - `styles.css` — styling (light/dark theme)
 - `manifest.json` / `sw.js` — PWA manifest and service worker
 - `vercel.json` — Vercel SPA fallback and cache headers
+- `firestore.rules`, `firebase.json`, `.firebaserc` — Firestore security rules and the Firebase CLI config used to deploy them
+- `firestore-tests/` — emulator tests for the rules (own `package.json`, kept out of the repository root so Vercel keeps serving the site as plain files)
+- `.github/workflows/firestore-rules.yml` — tests and deploys the rules
 
 ## Firestore data layout
 - `users/{uid}/categories/{categoryId}`
 - `users/{uid}/transactions/{txId}`
 - (plus collections for goals, recurring rules, debts, and subscriptions under `users/{uid}`)
 
-## Minimal security rules (starter)
-In Firebase Console → Firestore → Rules, you can start with:
+## Firestore security rules
+The rules are in `firestore.rules`. Each signed-in user can read and write only their own `users/{uid}/...` data; a record must have a positive number amount, a known type and a `YYYY-MM-DD` date; the currency label is at most 5 characters; everything else is denied.
 
-```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-  }
-}
-```
+- **Tests:** `cd firestore-tests && npm ci && npm test` runs `rules.spec.mjs` against the Firestore emulator (needs Java 11+). It covers the app's own write patterns and checks that other users and signed-out visitors get nothing.
+- **Deploy:** `.github/workflows/firestore-rules.yml` runs those tests on every change to the rules and, on `master`, deploys the rules to Firebase once the tests pass.
 
-(Adjust for your needs.)
+One-time setup for the automatic deploy:
+1. Google Cloud console → IAM & Admin → Service Accounts (project `accountbook-6e296`) → **Create service account**, e.g. `github-firestore-rules`.
+2. Give it the **Firebase Rules Admin** role.
+3. Open the service account → **Keys** → Add key → Create new key → **JSON** (a file downloads).
+4. GitHub repository → Settings → Secrets and variables → Actions → **New repository secret**: name `FIREBASE_SERVICE_ACCOUNT`, value = the whole content of that JSON file. Then delete the downloaded file.
+5. GitHub → Actions → **Firestore rules** → Run workflow (later runs start by themselves when `firestore.rules` changes on `master`).
+
+If the deploy step reports a missing permission, give the service account that role as well (for example Service Usage Consumer) and run the workflow again.

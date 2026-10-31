@@ -1,0 +1,84 @@
+# Tests firestore.rules on every change, and deploys them to Firebase when
+# they change on master (only after the tests pass).
+#
+# One-time setup (README → "Firestore security rules"): add a repository secret
+# FIREBASE_SERVICE_ACCOUNT holding the JSON key of a Google Cloud service
+# account that has the "Firebase Rules Admin" role on accountbook-6e296.
+name: Firestore rules
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - firestore.rules
+      - firebase.json
+      - .firebaserc
+      - firestore-tests/**
+      - .github/workflows/firestore-rules.yml
+  pull_request:
+    paths:
+      - firestore.rules
+      - firebase.json
+      - firestore-tests/**
+      - .github/workflows/firestore-rules.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Never run two deploys at once; a newer push waits for the running one.
+concurrency:
+  group: firestore-rules-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test rules in the emulator
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firestore-tests
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firestore-tests/package-lock.json
+      - uses: actions/setup-java@v5 # the Firestore emulator runs on Java
+        with:
+          distribution: temurin
+          java-version: 21
+      - run: npm ci
+      - run: npm test
+
+  deploy:
+    name: Deploy rules to Firebase
+    needs: test
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: firestore-tests
+    steps:
+      - name: Check the deploy key is set up
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        working-directory: .
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::Add the FIREBASE_SERVICE_ACCOUNT repository secret to deploy rules (README → Firestore security rules)."
+            exit 1
+          fi
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: firestore-tests/package-lock.json
+      - run: npm ci
+      - uses: google-github-actions/auth@v3
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy firestore.rules
+        run: npx firebase deploy --only firestore:rules --project accountbook-6e296 --config ../firebase.json --non-interactive

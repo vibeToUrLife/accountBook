@@ -1,0 +1,6 @@
+# Firestore rules tests (firestore-tests/)
+firestore-tests/node_modules/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+.firebase/

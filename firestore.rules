@@ -1,0 +1,64 @@
+rules_version = '2';
+
+// Firestore security rules for Account Book.
+//
+// All data lives under users/{uid}/... and only that signed-in user can read
+// or write it. Records are also checked for the shape the app writes, so a
+// bug can't store, say, an amount that is text. Anything not listed here is
+// denied.
+//
+// Deployed by .github/workflows/firestore-rules.yml when this file changes on
+// master, after the tests in firestore-tests/ pass.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // A record (expense or income) as the app writes it. For updates this is
+    // the whole document after the change, so partial updates are checked too.
+    function isValidTransaction(data) {
+      return data.amount is number && data.amount > 0
+        && data.type in ['expense', 'revenue']
+        && data.dateISO is string && data.dateISO.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && data.categoryId is string
+        && (!('note' in data) || (data.note is string && data.note.size() <= 500));
+    }
+
+    // settings/preferences: the currency label is shown before every amount.
+    function isValidSettings(data) {
+      return !('currencySymbol' in data)
+        || (data.currencySymbol is string && data.currencySymbol.size() <= 5);
+    }
+
+    match /users/{userId} {
+      allow read, write: if isOwner(userId);
+
+      match /transactions/{txId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidTransaction(request.resource.data);
+
+        // Receipt photos (one compressed image per document).
+        match /receipts/{receiptId} {
+          allow read, delete: if isOwner(userId);
+          allow create, update: if isOwner(userId) && request.resource.data.dataUrl is string;
+        }
+      }
+
+      match /settings/{settingId} {
+        allow read, delete: if isOwner(userId);
+        allow create, update: if isOwner(userId) && isValidSettings(request.resource.data);
+      }
+
+      // The other collections the app uses. Named explicitly: this match also
+      // covers transactions/ and settings/, which must only get the checked
+      // rules above.
+      match /{collection}/{docId} {
+        allow read, write: if isOwner(userId)
+          && collection in ['categories', 'savingsGoals', 'targets', 'recurring', 'templates', 'debts', 'subscriptions'];
+      }
+    }
+  }
+}
