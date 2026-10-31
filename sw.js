@@ -1,7 +1,13 @@
-const CACHE_NAME = "accountbook-v17";
+const CACHE_NAME = "accountbook-v18";
 const CDN_CACHE = "accountbook-cdn-v16";
+// The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
+// /index.html with a 308 to /, and a page load can't be answered with a cached
+// redirect (Safari: "Response served by service worker has redirections").
+const SHELL = "./";
+// How long a page load waits for the network before using the cached shell.
+const NAV_TIMEOUT_MS = 3000;
 const PRECACHE = [
-  "./index.html",
+  SHELL,
   "./styles.css?v=13",
   "./app.js?v=12",
   "./utils.js?v=6",
@@ -67,11 +73,17 @@ self.addEventListener("fetch", (e) => {
     return; // other cross-origin requests pass through untouched
   }
 
-  // Same-origin app shell: stale-while-revalidate.
+  // Page loads (home-screen launch, reload, typed URL).
+  if (e.request.mode === "navigate") {
+    e.respondWith(handleNavigation(e.request));
+    return;
+  }
+
+  // Same-origin app files: stale-while-revalidate.
   e.respondWith(
     caches.match(e.request).then((cached) => {
       const fetched = fetch(e.request).then((response) => {
-        if (response.ok) {
+        if (response.ok && !response.redirected) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
         }
@@ -81,3 +93,24 @@ self.addEventListener("fetch", (e) => {
     })
   );
 });
+
+// Network first, so a new deploy shows up on the next launch. The network answer is
+// passed back untouched: a redirect (/index.html -> /) is followed by the browser.
+// Offline, or when the network takes longer than NAV_TIMEOUT_MS, the cached shell
+// answers instead. Every app route serves index.html, so one shell fits them all.
+async function handleNavigation(request) {
+  const cache = await caches.open(CACHE_NAME);
+  const network = fetch(request).then((response) => {
+    const isPage = (response.headers.get("content-type") || "").includes("text/html");
+    if (response.ok && !response.redirected && isPage) cache.put(SHELL, response.clone());
+    return response;
+  });
+  const timeout = new Promise((resolve) => setTimeout(resolve, NAV_TIMEOUT_MS));
+  try {
+    const response = await Promise.race([network, timeout]);
+    if (response) return response;
+  } catch {
+    // offline: use the cached shell below
+  }
+  return (await cache.match(SHELL)) || network;
+}
