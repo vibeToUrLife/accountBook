@@ -115,10 +115,10 @@ The rules are in `firestore.rules`. Each signed-in user can read and write only 
 - **Deploy:** `.github/workflows/firestore-rules.yml` runs those tests on every change to the rules and, on `master`, deploys the rules to Firebase once the tests pass.
 
 One-time setup for the automatic deploy:
-1. Google Cloud console → IAM & Admin → Service Accounts (project `accountbook-6e296`) → **Create service account**, e.g. `github-firestore-rules`.
-2. Give it the **Firebase Rules Admin** role.
-3. Open the service account → **Keys** → Add key → Create new key → **JSON** (a file downloads).
+1. Google Cloud console → IAM & Admin → Service Accounts → **Create service account**, e.g. `github-firestore-rules`. Check that the project picker shows the ID `accountbook-6e296` (the Firebase project), not another project that is also called "accountbook".
+2. Give it two roles: **Firebase Rules Admin** (to publish rules) and **Service Usage Consumer** (the CLI checks that the Firestore API is enabled).
+3. Open the service account → **Keys** → Add key → Create new key → **JSON** (a file downloads). Its `project_id` must be `accountbook-6e296`.
 4. GitHub repository → Settings → Secrets and variables → Actions → **New repository secret**: name `FIREBASE_SERVICE_ACCOUNT`, value = the whole content of that JSON file. Then delete the downloaded file.
 5. GitHub → Actions → **Firestore rules** → Run workflow (later runs start by themselves when `firestore.rules` changes on `master`).
 
-If the deploy step reports a missing permission, give the service account that role as well (for example Service Usage Consumer) and run the workflow again.
+If the deploy step still reports a missing permission, give the service account the role it names and run the workflow again (new roles can take a few minutes to apply).
