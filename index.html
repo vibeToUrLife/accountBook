@@ -40,7 +40,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="./styles.css?v=16" />
+    <link rel="stylesheet" href="./styles.css?v=17" />
     <!-- Start downloading the Firebase SDK right away; otherwise it is only found
          after app.js and firebase.js have been fetched and parsed. -->
     <link rel="modulepreload" href="./firebase.js?v=2" />
@@ -108,7 +108,8 @@
       <div class="container">
         <div class="header-left">
           <button id="menuBtn" class="btn btn-secondary menu-btn" type="button" title="Menu"><svg class="icon" aria-hidden="true"><use href="#i-menu"></use></svg></button>
-          <h1 data-i18n><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>Account Book</h1>
+          <!-- Same image as the home-screen / browser icon (favicon.svg is icons/icon.svg with rounded corners). -->
+          <h1 data-i18n><img class="app-logo" src="./favicon.svg?v=2" alt="" width="30" height="30" />Account Book</h1>
         </div>
         <div class="header-right">
           <span id="offlinePill" class="offline-pill" role="status" aria-label="Offline" title="Offline — changes will sync when you're back online" hidden><svg class="icon icon-sm" aria-hidden="true"><use href="#i-alert"></use></svg><span data-i18n class="offline-pill-text">Offline</span></span>
@@ -124,7 +125,7 @@
     <div id="sidebarOverlay" class="sidebar-overlay" hidden></div>
     <nav id="sidebar" class="sidebar" aria-label="Main navigation">
       <div class="sidebar-header">
-        <h2 data-i18n><svg class="icon" aria-hidden="true"><use href="#i-wallet"></use></svg>Menu</h2>
+        <h2 data-i18n><img class="app-logo app-logo-sm" src="./favicon.svg?v=2" alt="" width="24" height="24" />Menu</h2>
         <button id="closeSidebar" class="btn btn-secondary btn-small" type="button" aria-label="Close"><svg class="icon icon-sm" aria-hidden="true"><use href="#i-x"></use></svg></button>
       </div>
       <!-- Phones hide the header's sign-in label; app.js mirrors it here. -->
