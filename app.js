@@ -1413,6 +1413,15 @@ function renderStats() {
   });
 }
 
+// The launch screen (index.html) stays up until this says the first screen is
+// drawn. Only the first call counts.
+let appReadySent = false;
+function signalAppReady() {
+  if (appReadySent) return;
+  appReadySent = true;
+  document.dispatchEvent(new Event("app-ready"));
+}
+
 let renderAllPending = false;
 function renderAll() {
   if (renderAllPending) return;
@@ -1524,6 +1533,8 @@ async function startListenersForUser(userId) {
     ensureStatsYearOptions();
     renderBudgetScopeLabel();
     renderAll();
+    // Queued after renderAll's frame, so the records are drawn when the logo goes.
+    requestAnimationFrame(signalAppReady);
     recurring.markTransactionsLoaded();
     recurring.autoRun();
   });
@@ -5501,6 +5512,7 @@ async function main() {
   if (!init.ok) {
     setWarning(init.reason);
     setAuthStatus(t("Firebase not configured"));
+    signalAppReady();
     return;
   }
 
@@ -5524,6 +5536,7 @@ async function main() {
       authUserLabel = "";
       setAuthStatus(t("Signed out"));
       setSignedOutUi();
+      signalAppReady();
       return;
     }
 

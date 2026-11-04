@@ -35,6 +35,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup (restores records with their original ids, so links to categories survive and importing the same file twice doesn't duplicate anything; receipt photos are not part of the backup)
 - Installable **PWA** that works offline: the service worker caches the app shell and Firestore keeps a local copy of your data, so records load without a connection and changes made offline sync when you are back online (an "Offline" badge shows in the header)
 - Cloud sync via Firebase (Email/Password or Google sign-in + Firestore)
+- **Launch screen**: opening the app shows its logo full screen until the first screen is drawn (at least ~0.65 s, at most 4 s), then fades into the app. On an iPhone home-screen app the same image shows from the moment the icon is tapped (`icons/splash/`, one per iPhone screen size; iOS fetches it when the app is added to the home screen, so re-add the app to pick up a new one)
 
 ## Firebase setup
 1. Create a project at https://console.firebase.google.com/
@@ -85,7 +86,7 @@ Pure logic (upcoming-items date math, recurring catch-up, subscription renewal d
 
 - `node --test`
 
-Browser checks drive the real app in Chromium on a phone-sized screen (UTC+8, fixed clock) with an in-memory stand-in for Firebase: adding records (also offline), recurring catch-up, subscriptions, budgets, delete/Undo, backup import, the assistant, layout and launch:
+Browser checks drive the real app in Chromium on a phone-sized screen (UTC+8, fixed clock) with an in-memory stand-in for Firebase: adding records (also offline), recurring catch-up, subscriptions, budgets, delete/Undo, backup import, the assistant, layout, the launch screen and launch:
 
 - `cd browser-tests && npm ci && npx playwright install chromium && npm test`
 
@@ -95,7 +96,7 @@ Browser checks drive the real app in Chromium on a phone-sized screen (UTC+8, fi
 - **Website**: Vercel deploys `master` to https://accbook.vercel.app/ on every push (and usually gives other branches a preview URL). Vercel does not wait for the tests; to make sure only tested code reaches `master`, protect the branch: Settings → Rules → Rulesets → New branch ruleset for `master`, with "Require a pull request before merging" and "Require status checks to pass" (Unit tests, Browser checks).
 
 ## Project structure
-- `index.html` — app shell and all views
+- `index.html` — app shell and all views; the launch screen (`#splash`) and its styles and timing are at the top
 - `app.js` — main application logic
 - `firebase.js` / `firebase-config.js` — Firebase init and config
 - `utils.js` — shared helpers
@@ -109,7 +110,7 @@ Browser checks drive the real app in Chromium on a phone-sized screen (UTC+8, fi
 - `manifest.json` / `sw.js` — PWA manifest and service worker
 - `vercel.json` — Vercel SPA fallback and cache headers
 - `firestore.rules`, `firebase.json`, `.firebaserc` — Firestore security rules and the Firebase CLI config used to deploy them
-- `browser-tests/` — browser checks of the app (Playwright; own `package.json`)
+- `browser-tests/` — browser checks of the app (Playwright; own `package.json`); `npm run splash` there re-renders the iPhone launch images in `icons/splash/` after a change to the launch screen
 - `.github/workflows/ci.yml` — runs the unit tests and browser checks
 - `firestore-tests/` — emulator tests for the rules (own `package.json`, kept out of the repository root so Vercel keeps serving the site as plain files)
 - `.github/workflows/firestore-rules.yml` — tests and deploys the rules

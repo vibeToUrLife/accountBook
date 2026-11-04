@@ -8,6 +8,36 @@
     <link rel="icon" href="./favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=2" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
+    <!-- iPhone home-screen app: shown from the tap until the page draws its own launch
+         screen (#splash), so the logo is there at once. Renders of #splash, one per
+         screen size (browser-tests/make-splash-images.mjs). iOS keeps the one it fetched
+         when the app was added to the home screen. -->
+    <!-- iPhone 16 Pro Max, 17 Pro Max -->
+    <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1320x2868.png" />
+    <!-- iPhone Air -->
+    <link rel="apple-touch-startup-image" media="(device-width: 420px) and (device-height: 912px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1260x2736.png" />
+    <!-- iPhone 16 Pro, 17, 17 Pro -->
+    <link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1206x2622.png" />
+    <!-- iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus -->
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1290x2796.png" />
+    <!-- iPhone 14 Pro, 15, 15 Pro, 16 -->
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1179x2556.png" />
+    <!-- iPhone 12 Pro Max, 13 Pro Max, 14 Plus -->
+    <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1284x2778.png" />
+    <!-- iPhone 12, 12 Pro, 13, 13 Pro, 14, 16e -->
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1170x2532.png" />
+    <!-- iPhone X, XS, 11 Pro, 12 mini, 13 mini -->
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1125x2436.png" />
+    <!-- iPhone XS Max, 11 Pro Max -->
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1242x2688.png" />
+    <!-- iPhone XR, 11 -->
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="./icons/splash/splash-828x1792.png" />
+    <!-- iPhone 6s Plus, 7 Plus, 8 Plus -->
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 736px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1242x2208.png" />
+    <!-- iPhone 6s, 7, 8, SE (2nd/3rd gen) -->
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="./icons/splash/splash-750x1334.png" />
+    <!-- iPhone SE (1st gen) -->
+    <link rel="apple-touch-startup-image" media="(device-width: 320px) and (device-height: 568px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="./icons/splash/splash-640x1136.png" />
     <!-- app.js keeps this in step with the header colour of the active theme. -->
     <meta name="theme-color" content="#ffffff" />
     <meta name="mobile-web-app-capable" content="yes" />
@@ -37,6 +67,72 @@
         } catch (e) {}
       })();
     </script>
+    <!-- Launch screen (#splash, first thing in <body>): the app icon full screen, from
+         the first paint until the app has drawn its first screen. Its styles live here,
+         not in styles.css, so it shows even before (or without) anything else.
+         icons/splash/*.png are renders of it for the iPhone home-screen app; after a
+         change here, re-render them: cd browser-tests && npm run splash -->
+    <style>
+      .splash {
+        position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 100000;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background:
+          radial-gradient(75% 75% at 22% 12%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0)),
+          linear-gradient(to bottom right, #6c6af5, #4135c9);
+        color: #fff;
+        visibility: visible; /* html.i18n-pending hides the rest of the page, not this */
+        -webkit-user-select: none; user-select: none;
+        transition: opacity 0.4s ease;
+        /* Safety net that needs no script: gone after 8 s, whatever happens. */
+        animation: splash-timeout 0.4s ease 8s forwards;
+      }
+      .splash-logo { width: 168px; height: 168px; transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1); }
+      .splash-name {
+        margin: 18px 0 0; height: 30px; color: #fff;
+        font: 700 22px/30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        letter-spacing: 0.01em;
+        opacity: 0; animation: splash-fade-in 0.45s ease-out 0.12s forwards;
+      }
+      html[lang="zh-CN"] .splash-name [lang="en"], html:not([lang="zh-CN"]) .splash-name [lang="zh-CN"] { display: none; }
+      /* Only shows when loading takes a while. */
+      .splash-dots { display: flex; height: 6px; margin-top: 28px; opacity: 0; animation: splash-fade-in 0.4s ease-out 1.2s forwards; }
+      .splash-dots i { width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: #fff; animation: splash-dot 1.05s ease-in-out infinite; }
+      .splash-dots i:nth-child(2) { animation-delay: 0.15s; }
+      .splash-dots i:nth-child(3) { animation-delay: 0.3s; }
+      html.splash-leaving .splash { opacity: 0; pointer-events: none; }
+      html.splash-leaving .splash-logo { transform: scale(1.12); }
+      html.splash-gone .splash { display: none; }
+      @keyframes splash-fade-in { to { opacity: 1; } }
+      @keyframes splash-dot { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+      @keyframes splash-timeout { to { opacity: 0; visibility: hidden; } }
+      @media (prefers-reduced-motion: reduce) {
+        html.splash-leaving .splash-logo { transform: none; }
+        .splash-dots i { animation: none; opacity: 0.7; }
+      }
+    </style>
+    <script>
+      // Launch screen timing. app.js fires "app-ready" once its first screen is drawn
+      // (records, or the sign-in form). The logo stays at least SPLASH_MIN_MS after the
+      // page started loading, so it doesn't just flicker, and goes at SPLASH_MAX_MS
+      // even if the app is still waiting (slow network, error).
+      (function () {
+        var SPLASH_MIN_MS = 650, SPLASH_MAX_MS = 4000;
+        var root = document.documentElement, done = false;
+        function hide() {
+          if (done) return;
+          done = true;
+          root.classList.add("splash-leaving");
+          setTimeout(function () {
+            root.classList.add("splash-gone");
+            var el = document.getElementById("splash");
+            if (el) el.remove();
+          }, 450);
+        }
+        function at(ms, fn) { setTimeout(fn, Math.max(0, ms - performance.now())); }
+        document.addEventListener("app-ready", function () { at(SPLASH_MIN_MS, hide); });
+        at(SPLASH_MAX_MS, hide);
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -49,6 +145,35 @@
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js" />
   </head>
   <body>
+    <!-- Launch screen; styles and timing are in <head>. The logo is the app icon's
+         artwork (icons/icon.svg) without its tile; ids are prefixed because inline
+         SVG ids are shared with the whole page. -->
+    <div id="splash" class="splash" aria-hidden="true">
+      <svg class="splash-logo" viewBox="40 21 456 456" focusable="false">
+        <defs>
+          <linearGradient id="splash-body" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="1" stop-color="#e6e8ff"/>
+          </linearGradient>
+          <filter id="splash-drop" x="-25%" y="-25%" width="150%" height="160%">
+            <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#1e1b4b" flood-opacity="0.35"/>
+          </filter>
+        </defs>
+        <g transform="rotate(-11 252 170)">
+          <rect x="140" y="104" width="224" height="132" rx="20" fill="#34d399"/>
+          <rect x="140" y="104" width="224" height="132" rx="20" fill="none" stroke="#059669" stroke-opacity=".45" stroke-width="6"/>
+          <circle cx="252" cy="150" r="20" fill="none" stroke="#047857" stroke-opacity=".45" stroke-width="7"/>
+        </g>
+        <g filter="url(#splash-drop)">
+          <rect x="104" y="172" width="296" height="232" rx="52" fill="url(#splash-body)"/>
+          <path d="M156 172h192a52 52 0 0 1 52 52v6H104v-6a52 52 0 0 1 52-52z" fill="#c7cdfd"/>
+          <path d="M318 252h82a32 32 0 0 1 32 32v40a32 32 0 0 1-32 32h-82a52 52 0 0 1 0-104z" fill="#4f46e5"/>
+          <circle cx="326" cy="304" r="17" fill="#ffffff"/>
+        </g>
+      </svg>
+      <p class="splash-name"><span lang="en">Account Book</span><span lang="zh-CN">记账本</span></p>
+      <span class="splash-dots"><i></i><i></i><i></i></span>
+    </div>
     <!-- SVG icon sprite (Lucide-style). Referenced via <svg class="icon"><use href="#i-NAME"></use></svg> -->
     <svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
       <symbol id="i-menu" viewBox="0 0 24 24"><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="18" y2="18"/></symbol>
@@ -1304,7 +1429,7 @@
     </div>
 
     <script type="module" src="./js/boot.js?v=1"></script>
-    <script type="module" src="./app.js?v=15"></script>
+    <script type="module" src="./app.js?v=16"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {
