@@ -297,6 +297,36 @@ test("layout on a phone: fits the screen, no iOS zoom, translated labels, readab
   check.done();
 });
 
+test("header logo: the app's own icon, kept through translation and cached for offline", async () => {
+  const check = checks();
+  for (const [lang, title, menu] of [["en", "Account Book", "Menu"], ["zh", "记账本", "菜单"]]) {
+    const { ctx, page } = await openApp(browser, base, { seed: [cat("c1", "Food")], lang });
+    try {
+      const r = await page.evaluate(async () => {
+        const icon = document.querySelector('link[rel="icon"][type="image/svg+xml"]').getAttribute("href");
+        const logos = [".app-header h1 img", ".sidebar-header h2 img"].map((s) => {
+          const img = document.querySelector(s);
+          return img && { src: img.getAttribute("src"), alt: img.getAttribute("alt"), loaded: img.complete && img.naturalWidth > 0 };
+        });
+        const sw = await (await fetch("./sw.js")).text();
+        return {
+          icon, logos, precached: sw.includes(`"${icon}"`),
+          title: document.querySelector(".app-header h1").textContent.trim(),
+          menu: document.querySelector(".sidebar-header h2").textContent.trim(),
+        };
+      });
+      check(`${lang}: header and menu show the app icon (the browser icon's file)`, r.logos.every((l) => l && l.src === r.icon), JSON.stringify(r.logos));
+      check(`${lang}: the icon loads`, r.logos.every((l) => l?.loaded));
+      check(`${lang}: decorative (empty alt), headings read "${title}" / "${menu}"`,
+        r.logos.every((l) => l?.alt === "") && r.title === title && r.menu === menu, `${r.title} / ${r.menu}`);
+      if (lang === "en") check("the icon is in the service worker's offline cache", r.precached, r.icon);
+    } finally {
+      await ctx.close();
+    }
+  }
+  check.done();
+});
+
 // ── Adding records ──────────────────────────────────────────────────────────
 
 const formSeed = [cat("c1", "Food"), cat("c2", "Transport"), cat("c3", "Rental"),
