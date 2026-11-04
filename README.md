@@ -35,7 +35,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup (restores records with their original ids, so links to categories survive and importing the same file twice doesn't duplicate anything; receipt photos are not part of the backup)
 - Installable **PWA** that works offline: the service worker caches the app shell and Firestore keeps a local copy of your data, so records load without a connection and changes made offline sync when you are back online (an "Offline" badge shows in the header)
 - Cloud sync via Firebase (Email/Password or Google sign-in + Firestore)
-- **Launch screen**: opening the app shows its logo full screen until the first screen is drawn (at least ~0.65 s, at most 4 s), then fades into the app. On an iPhone home-screen app the same image shows from the moment the icon is tapped (`icons/splash/`, one per iPhone screen size; iOS fetches it when the app is added to the home screen, so re-add the app to pick up a new one)
+- **Launch screen**: opening the app shows its logo full screen until the first screen is drawn (on screen at least 1.2 s, at most 4 s), then fades into the app. On an iPhone home-screen app the same image shows from the moment the icon is tapped (`icons/splash/`, one per iPhone screen size; iOS fetches it when the app is added to the home screen, so re-add the app to pick up a new one)
 
 ## Firebase setup
 1. Create a project at https://console.firebase.google.com/
