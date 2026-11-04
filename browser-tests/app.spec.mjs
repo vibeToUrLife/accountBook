@@ -462,10 +462,12 @@ test("launch: theme and language applied before app.js arrives", async () => {
   check.done();
 });
 
-// Notes when the launch screen starts to go and is gone (ms since the page began
-// loading), and what was drawn when app.js said it was ready.
+// Notes when the launch screen is first drawn, starts to go and is gone (ms since the
+// page began loading), and what was drawn when app.js said it was ready.
 const WATCH_SPLASH = `(${() => {
   const s = (window.__splash = {});
+  const firstFrame = () => (document.getElementById("splash") ? (s.shown = performance.now()) : requestAnimationFrame(firstFrame));
+  requestAnimationFrame(firstFrame);
   document.addEventListener("app-ready", () => {
     s.ready = performance.now();
     s.rowsAtReady = document.querySelectorAll("#txTbody tr").length;
@@ -508,12 +510,12 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
       await page.waitForFunction(() => window.__splash.gone != null, null, { timeout: 8000 });
       const s = await page.evaluate(() => ({ ...window.__splash, inDom: !!document.getElementById("splash"), signIn: !document.getElementById("authCard").hidden }));
       const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v) : v));
-      check(`${label}: taken out of the page afterwards`, !s.inDom && s.gone - s.leaving >= 400, t);
+      check(`${label}: taken out of the page after its fade`, !s.inDom && s.gone - s.leaving >= 550, t);
       if (label === "app.js doesn't load") {
-        check(`${label}: goes by itself after ~4 s`, s.ready == null && s.leaving >= 3900 && s.leaving < 4600, t);
+        check(`${label}: goes by itself ~4 s after it appeared`, s.ready == null && s.leaving - s.shown >= 3900 && s.leaving - s.shown < 4600, t);
       } else {
-        check(`${label}: stays at least ~0.65 s, so it doesn't flicker`, s.leaving >= 600, t);
-        check(`${label}: goes right after the app is ready`, s.ready != null && s.leaving - Math.max(s.ready, 650) < 300, t);
+        check(`${label}: on screen at least ~1.2 s, so it doesn't just flash by`, s.leaving - s.shown >= 1150, t);
+        check(`${label}: goes right after that once the app is ready`, s.ready != null && s.leaving - Math.max(s.ready, s.shown + 1200) < 300, t);
         if (label === "signed out") check(`${label}: the sign-in form is what's underneath`, s.signIn, t);
         else check(`${label}: the records are drawn before it goes`, s.rowsAtReady >= 1, t);
         check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
