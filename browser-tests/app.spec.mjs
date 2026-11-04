@@ -462,6 +462,69 @@ test("launch: theme and language applied before app.js arrives", async () => {
   check.done();
 });
 
+// Notes when the launch screen starts to go and is gone (ms since the page began
+// loading), and what was drawn when app.js said it was ready.
+const WATCH_SPLASH = `(${() => {
+  const s = (window.__splash = {});
+  document.addEventListener("app-ready", () => {
+    s.ready = performance.now();
+    s.rowsAtReady = document.querySelectorAll("#txTbody tr").length;
+  });
+  new MutationObserver(() => {
+    const c = document.documentElement.classList;
+    if (c.contains("splash-leaving") && s.leaving == null) s.leaving = performance.now();
+    if (c.contains("splash-gone") && s.gone == null) s.gone = performance.now();
+  }).observe(document, { attributes: true, subtree: true, attributeFilter: ["class"] });
+}})();`;
+
+test("launch screen: the logo first, gone once the records are drawn, never stuck", async () => {
+  const check = checks();
+  const seed = [...formSeed, tx("t1", "c1", 12, "expense", "2026-10-30", { categoryName: "Food" })];
+  const cases = [
+    ["signed in", { seed }, "Account Book"],
+    ["signed in, Chinese", { seed, lang: "zh" }, "记账本"],
+    ["signed out", { seed, init: WATCH_SPLASH + "window.__SIGNED_OUT = true;" }, "Account Book"],
+    // boot.js blocked too, so the page stays hidden for translation: the logo still shows.
+    ["app.js doesn't load", { seed, lang: "zh", block: ["/app.js", "/js/boot.js"] }, "记账本"],
+  ];
+  for (const [label, opts, name] of cases) {
+    const { ctx, page, errors } = await openApp(browser, base, { init: WATCH_SPLASH, ...opts, waitSignedIn: false });
+    try {
+      const start = await page.evaluate(() => {
+        const splash = document.getElementById("splash"), r = splash?.getBoundingClientRect();
+        const top = document.elementFromPoint(innerWidth / 2, innerHeight / 2);
+        return {
+          covers: !!r && r.width === innerWidth && r.height === innerHeight && splash.contains(top),
+          shown: !!splash && getComputedStyle(splash).visibility === "visible",
+          pagePending: document.documentElement.classList.contains("i18n-pending"),
+          logo: splash?.querySelector(".splash-logo").getBoundingClientRect().width,
+          name: [...(splash?.querySelectorAll(".splash-name span") || [])].filter((el) => el.offsetParent !== null).map((el) => el.textContent).join(),
+        };
+      });
+      check(`${label}: the logo covers the screen as the page opens`, start.covers && start.shown && start.logo > 100, JSON.stringify(start));
+      check(`${label}: the name under it is "${name}"`, start.name === name, start.name);
+      if (label === "app.js doesn't load") check(`${label}: shown while the page waits for its translation`, start.pagePending && start.shown);
+
+      await page.waitForFunction(() => window.__splash.gone != null, null, { timeout: 8000 });
+      const s = await page.evaluate(() => ({ ...window.__splash, inDom: !!document.getElementById("splash"), signIn: !document.getElementById("authCard").hidden }));
+      const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v) : v));
+      check(`${label}: taken out of the page afterwards`, !s.inDom && s.gone - s.leaving >= 400, t);
+      if (label === "app.js doesn't load") {
+        check(`${label}: goes by itself after ~4 s`, s.ready == null && s.leaving >= 3900 && s.leaving < 4600, t);
+      } else {
+        check(`${label}: stays at least ~0.65 s, so it doesn't flicker`, s.leaving >= 600, t);
+        check(`${label}: goes right after the app is ready`, s.ready != null && s.leaving - Math.max(s.ready, 650) < 300, t);
+        if (label === "signed out") check(`${label}: the sign-in form is what's underneath`, s.signIn, t);
+        else check(`${label}: the records are drawn before it goes`, s.rowsAtReady >= 1, t);
+        check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
+      }
+    } finally {
+      await ctx.close();
+    }
+  }
+  check.done();
+});
+
 test("charts: Chart.js loads from the site only when a chart screen opens", async () => {
   const check = checks();
   const { ctx, page, requests, errors } = await openApp(browser, base, { seed: [...formSeed, tx("t1", "c1", 20, "expense", "2026-10-20", { categoryName: "Food" })] });

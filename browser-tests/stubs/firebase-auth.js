@@ -1,6 +1,8 @@
 const USER = { uid: "u1", email: "lowky999@gmail.com" };
-export function getAuth() { return { currentUser: USER }; }
-export function onAuthStateChanged(auth, cb) { setTimeout(() => cb(USER), 0); return () => {}; }
+// window.__SIGNED_OUT = true (set before the page loads) starts the app signed out.
+const user = () => (globalThis.__SIGNED_OUT ? null : USER);
+export function getAuth() { return { currentUser: user() }; }
+export function onAuthStateChanged(auth, cb) { setTimeout(() => cb(user()), 0); return () => {}; }
 export async function createUserWithEmailAndPassword() {}
 export async function signInWithEmailAndPassword() {}
 export class GoogleAuthProvider {}
