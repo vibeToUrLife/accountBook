@@ -1,7 +1,7 @@
 // One-off diagnosis (throwaway branch): start the live site like the iPhone home-screen
 // app just back from Google sign-in (pending redirect), and record what Firebase's
 // sign-in helper (/__/auth/, proxied by vercel.json) does and how long start-up takes.
-import { chromium } from "playwright";
+import { chromium } from "../../browser-tests/node_modules/playwright/index.mjs";
 import { firebaseConfig } from "../../firebase-config.js";
 
 const t0 = Date.now();
