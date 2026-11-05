@@ -3,7 +3,7 @@
 // header toggles to their final state, and reveals the page that the <head>
 // script hid to avoid a flash of English. app.js repeats these steps later
 // (they're idempotent).
-import { initLang, getLang, translateDom } from "./i18n.js?v=2"; // same URL as app.js: one shared module
+import { initLang, getLang, translateDom } from "./i18n.js?v=3"; // same URL as app.js: one shared module
 
 initLang();
 translateDom();

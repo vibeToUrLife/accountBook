@@ -1,6 +1,6 @@
 // Savings Goals feature module. Progress comes from the goal's own
 // contributions (deposits minus withdrawals), stored on the goal document.
-import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=3"; // query must match app.js so both share one module instance
 export function createGoals(ctx) {
   const { money, icon, escapeHtml, todayISO, normalizeText, parsePositiveAmount, showUndoToast, userCollections, firestore } = ctx;
   const { addDoc, deleteDoc, setDoc, doc, serverTimestamp } = firestore;

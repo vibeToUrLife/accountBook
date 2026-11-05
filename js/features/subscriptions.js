@@ -1,7 +1,7 @@
 // Subscriptions feature module. Awareness tracker + "Pay & Record" (logs an
 // expense and rolls the renewal date forward one cycle). Receives the shared
 // `ctx` from the core; reads live state via ctx.* and writes through Firestore.
-import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=3"; // query must match app.js so both share one module instance
 
 /**
  * The renewal one cycle after `dateISO` (YYYY-MM-DD, local time). The day of

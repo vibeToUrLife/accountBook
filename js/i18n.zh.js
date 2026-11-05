@@ -394,6 +394,7 @@ export const zh = {
   "Email already in use. Try signing in.": "邮箱已被使用，请直接登录。",
   "Password is too weak (min 6 characters).": "密码太弱（至少 6 个字符）。",
   "Google sign-in popup was closed.": "Google 登录窗口已关闭。",
+  "Google sign-in didn't finish. Please try again.": "Google 登录没有完成，请再试一次。",
   "Google sign-in popup was blocked by the browser. Try again or use a normal browser (Chrome/Safari).": "浏览器拦截了 Google 登录窗口。请重试，或改用 Chrome/Safari 等普通浏览器。",
   "Google sign-in is not supported in this browser (common in in-app browsers). Open the site in Chrome/Safari and try again.": "此浏览器不支持 Google 登录（应用内置浏览器常见）。请用 Chrome/Safari 打开本站再试。",
   "Network request failed. Check your connection, disable VPN/ad blocker, and try again. On mobile, open the site in Chrome/Safari (not an in-app browser) and make sure cookies are allowed.": "网络请求失败。请检查网络、关闭 VPN 或广告拦截后重试。手机上请用 Chrome/Safari 打开本站（不要用应用内置浏览器），并允许 Cookie。",

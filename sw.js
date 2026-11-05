@@ -1,4 +1,4 @@
-const CACHE_NAME = "accountbook-v24";
+const CACHE_NAME = "accountbook-v25";
 const CDN_CACHE = "accountbook-cdn-v16";
 // The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
 // /index.html with a 308 to /, and a page load can't be answered with a cached
@@ -11,22 +11,23 @@ const NAV_TIMEOUT_MS = 1500;
 const PRECACHE = [
   SHELL,
   "./styles.css?v=17",
-  "./app.js?v=17",
-  "./js/boot.js?v=1",
+  "./app.js?v=18",
+  "./js/boot.js?v=2",
   "./utils.js?v=7",
-  "./firebase.js?v=3",
-  "./firebase-config.js",
-  "./js/i18n.js?v=2",
-  "./js/i18n.zh.js?v=3",
+  "./firebase.js?v=4",
+  "./firebase-config.js?v=2",
+  "./js/auth-domain.js?v=1",
+  "./js/i18n.js?v=3",
+  "./js/i18n.zh.js?v=4",
   "./js/backup.js?v=1",
-  "./js/features/debts.js?v=2",
-  "./js/features/goals.js?v=3",
-  "./js/features/receipts.js?v=3",
-  "./js/features/recurring.js?v=2",
-  "./js/features/subscriptions.js?v=2",
-  "./js/features/targets.js?v=2",
-  "./js/features/templates.js?v=3",
-  "./js/features/upcoming.js?v=2",
+  "./js/features/debts.js?v=3",
+  "./js/features/goals.js?v=4",
+  "./js/features/receipts.js?v=4",
+  "./js/features/recurring.js?v=3",
+  "./js/features/subscriptions.js?v=3",
+  "./js/features/targets.js?v=3",
+  "./js/features/templates.js?v=4",
+  "./js/features/upcoming.js?v=3",
   "./favicon.svg?v=2",
 ];
 
@@ -62,6 +63,11 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return; // never touch writes (Firestore POST/PATCH)
   const url = new URL(e.request.url);
+
+  // Google sign-in's helper pages, which vercel.json proxies to Firebase: straight to
+  // the network, never cached. (Handled as a page load, the helper page would be
+  // stored as the app shell, or answered with the shell when the network is slow.)
+  if (url.origin === location.origin && url.pathname.startsWith("/__/")) return;
 
   // Cross-origin: only cache known static CDN libraries/fonts.
   // Firebase API/Auth calls (googleapis.com, identitytoolkit, firestore) are left alone.

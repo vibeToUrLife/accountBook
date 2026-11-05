@@ -1,7 +1,7 @@
 // Receipt photos feature module. Owns the pending-photo queue and the viewer
 // state internally. Photos live in a per-transaction `receipts` subcollection;
 // the transaction carries only a tiny `receiptCount`.
-import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=3"; // query must match app.js so both share one module instance
 export function createReceipts(ctx) {
   const { icon, userCollections, firestore } = ctx;
   const { collection, doc, addDoc, getDocs, deleteDoc, setDoc, serverTimestamp, query, orderBy } = firestore;

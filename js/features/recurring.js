@@ -9,7 +9,7 @@
 // on the 31st lands on the last day of shorter months. The record for one month
 // has a fixed id, written inside a transaction that first checks the server, so
 // two tabs or devices never record the same month twice.
-import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=3"; // query must match app.js so both share one module instance
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
