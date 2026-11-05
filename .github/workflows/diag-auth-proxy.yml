@@ -1,0 +1,39 @@
+# One-off diagnosis of the Firebase sign-in helper proxy (throwaway branch, never merged).
+name: Diagnose sign-in proxy
+on:
+  push:
+    branches: [diag-auth-proxy]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Fetch the helper pages (proxied and originals)
+        run: |
+          for u in \
+            "https://accbook.vercel.app/__/auth/handler" \
+            "https://accbook.vercel.app/__/auth/iframe?apiKey=x&appName=%5BDEFAULT%5D&v=10.14.1" \
+            "https://accbook.vercel.app/__/auth/iframe.js" \
+            "https://accbook.vercel.app/__/auth/handler.js" \
+            "https://accbook.vercel.app/__/firebase/init.json" \
+            "https://accountbook-6e296.firebaseapp.com/__/auth/handler" \
+            "https://accountbook-6e296.firebaseapp.com/__/auth/iframe?apiKey=x&appName=%5BDEFAULT%5D&v=10.14.1" \
+            "https://accountbook-6e296.firebaseapp.com/__/auth/iframe.js" \
+            "https://accountbook-6e296.firebaseapp.com/__/firebase/init.json"; do
+            echo "=================== $u"
+            curl -sS -o body.txt -D headers.txt -w "status %{http_code} | type %{content_type} | bytes %{size_download}\n" "$u" || true
+            grep -iE "^(server|x-vercel-cache|x-frame-options|content-security-policy|location):" headers.txt || true
+            grep -o "<title>[^<]*</title>" body.txt || true
+            grep -oE "<script[^>]*src=\"[^\"]*\"" body.txt || true
+            grep -c 'id="splash"' body.txt | sed 's/^/app-page markers: /'
+            head -c 240 body.txt; echo
+          done
+      - name: Install the browser
+        working-directory: browser-tests
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: Start the live site like the home-screen app back from Google
+        working-directory: browser-tests
+        run: node ../.github/diag/auth-proxy.mjs
