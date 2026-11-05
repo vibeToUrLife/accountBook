@@ -53,6 +53,16 @@
       // Start-up errors (scripts that failed to load, uncaught errors), shown on the
       // launch screen if the app never comes up, so a screenshot says what went wrong.
       // Fonts, images and stylesheets falling back aren't the app failing: not listed.
+      // The first frame that draws the launch screen (#splash): its timing counts from
+      // here (see the script after #splash). Noted from the start of the page, because
+      // on a slow network the page arrives in pieces and the rest of it, that script
+      // included, can come well after the logo is already on screen.
+      (function () {
+        requestAnimationFrame(function first() {
+          if (document.getElementById("splash")) window.__splashShownAt = performance.now();
+          else requestAnimationFrame(first);
+        });
+      })();
       (function () {
         var errors = (window.__startupErrors = []);
         addEventListener("error", function (e) {
@@ -199,9 +209,9 @@
       </div>
     </div>
     <script>
-      // Launch screen timing, counted from the first frame that shows the logo (on a
-      // phone the page itself takes a moment to arrive, so counting from the start of
-      // loading would leave the logo only a flash). It stays at least SPLASH_MIN_MS and
+      // Launch screen timing, counted from the first frame that shows the logo (noted by
+      // the first script in <head>; counting from the start of loading would leave the
+      // logo only a flash, counting from here would add however late this part arrived). It stays at least SPLASH_MIN_MS and
       // goes once app.js fires "app-ready" (its first screen is drawn: records, or the
       // sign-in form). After SPLASH_MAX_MS it goes as soon as the app shows anything
       // (records may still be loading), but never to uncover a page with only the
@@ -247,11 +257,12 @@
           if (ready && shownAt !== null) setTimeout(hide, Math.max(0, shownAt + SPLASH_MIN_MS - performance.now()));
         }
         document.addEventListener("app-ready", function () { ready = true; hideWhenDue(); });
-        requestAnimationFrame(function () {
-          shownAt = performance.now();
-          setTimeout(waitForApp, SPLASH_MAX_MS);
+        (function whenShown() {
+          if (window.__splashShownAt == null) return requestAnimationFrame(whenShown);
+          shownAt = window.__splashShownAt;
+          setTimeout(waitForApp, Math.max(0, shownAt + SPLASH_MAX_MS - performance.now()));
           hideWhenDue();
-        });
+        })();
       })();
     </script>
     <!-- SVG icon sprite (Lucide-style). Referenced via <svg class="icon"><use href="#i-NAME"></use></svg> -->

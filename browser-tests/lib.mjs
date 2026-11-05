@@ -19,7 +19,7 @@ const TYPES = {
 /** Serve the repository like the live site (plain files, "/" → index.html, "/x" → x.html as Vercel's cleanUrls does). */
 export function startServer() {
   const server = http.createServer(async (req, res) => {
-    const { pathname } = new URL(req.url, "http://localhost");
+    const { pathname, searchParams } = new URL(req.url, "http://localhost");
     let file = path.join(ROOT, pathname === "/" ? "index.html" : decodeURIComponent(pathname));
     if (!file.startsWith(ROOT)) return res.writeHead(403).end();
     try {
@@ -29,6 +29,13 @@ export function startServer() {
         return readFile(file);
       });
       res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
+      // "/?arrive=slow": the page comes in two pieces, the rest 600 ms after the launch
+      // screen, the way a page can arrive over a slow phone network.
+      if (pathname === "/" && searchParams.get("arrive") === "slow") {
+        const html = body.toString(), cut = html.indexOf("</div>", html.indexOf('<div id="splash"')) + 6;
+        res.write(html.slice(0, cut));
+        return setTimeout(() => res.end(html.slice(cut)), 600);
+      }
       res.end(body);
     } catch {
       res.writeHead(404).end("not found");
