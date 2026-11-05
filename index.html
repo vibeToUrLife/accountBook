@@ -8,10 +8,11 @@
     <link rel="icon" href="./favicon.ico" sizes="32x32" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg?v=2" />
     <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png" />
-    <!-- iPhone home-screen app: shown from the tap until the page draws its own launch
-         screen (#splash), so the logo is there at once. Renders of #splash, one per
-         screen size (browser-tests/make-splash-images.mjs). iOS keeps the one it fetched
-         when the app was added to the home screen. -->
+    <!-- iPhone home-screen app: shown from the tap until the page draws. Plain white, the
+         colour of the frame iOS shows before the page's first paint, so nothing blinks;
+         the logo then fades in on the page (#splash, html.ios-app). One per screen size
+         (browser-tests/make-splash-images.mjs). iOS keeps the one it fetched when the
+         app was added to the home screen. -->
     <!-- iPhone 16 Pro Max, 17 Pro Max -->
     <link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="./icons/splash/splash-1320x2868.png" />
     <!-- iPhone Air -->
@@ -51,6 +52,10 @@
       // it, so it doesn't flash light / English first. The timer is a safety net.
       (function () {
         var root = document.documentElement;
+        // Opened from the iPhone/iPad home screen (added from Safari or Chrome).
+        if (navigator.standalone === true || (matchMedia("(display-mode: standalone)").matches && /iPhone|iPad|iPod/.test(navigator.userAgent))) {
+          root.classList.add("ios-app");
+        }
         try {
           var theme = localStorage.getItem("accountBook.theme");
           if (theme !== "dark" && theme !== "light") theme = matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -70,15 +75,15 @@
     <!-- Launch screen (#splash, first thing in <body>, timing script right after it): the
          app icon full screen, from the first paint until the app has drawn its first
          screen. Its styles live here, not in styles.css, so it shows even before (or
-         without) anything else. icons/splash/*.png are renders of it for the iPhone
-         home-screen app; after a change here, re-render them: cd browser-tests && npm run splash -->
+         without) anything else. -->
     <style>
       .splash {
         position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 100000;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background:
+        --splash-colours:
           radial-gradient(75% 75% at 22% 12%, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0)),
           linear-gradient(to bottom right, #6c6af5, #4135c9);
+        background: var(--splash-colours);
         color: #fff;
         visibility: visible; /* html.i18n-pending hides the rest of the page, not this */
         -webkit-user-select: none; user-select: none;
@@ -99,6 +104,17 @@
       .splash-dots i { width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: #fff; animation: splash-dot 1.05s ease-in-out infinite; }
       .splash-dots i:nth-child(2) { animation-delay: 0.15s; }
       .splash-dots i:nth-child(3) { animation-delay: 0.3s; }
+      /* iPhone home-screen app: between its launch image and the page's first paint, iOS
+         shows a white frame (WebKit bug 311569; nothing on the page can reach it). So
+         there the launch image (icons/splash/) and the first frame are plain white, and
+         the colours and the logo fade in after it, instead of logo, white blink, logo. */
+      html.ios-app .splash { background: #fff; }
+      html.ios-app .splash::before {
+        content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1;
+        background: var(--splash-colours);
+        opacity: 0; animation: splash-fade-in 0.35s ease-out forwards;
+      }
+      html.ios-app .splash-logo { opacity: 0; animation: splash-fade-in 0.35s ease-out forwards; }
       html.splash-leaving .splash { opacity: 0; pointer-events: none; }
       html.splash-leaving .splash-logo { transform: scale(1.08); }
       html.splash-gone .splash { display: none; }
@@ -116,7 +132,7 @@
     <link rel="stylesheet" href="./styles.css?v=17" />
     <!-- Start downloading the Firebase SDK right away; otherwise it is only found
          after app.js and firebase.js have been fetched and parsed. -->
-    <link rel="modulepreload" href="./firebase.js?v=2" />
+    <link rel="modulepreload" href="./firebase.js?v=3" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js" />
@@ -1436,7 +1452,7 @@
     </div>
 
     <script type="module" src="./js/boot.js?v=1"></script>
-    <script type="module" src="./app.js?v=16"></script>
+    <script type="module" src="./app.js?v=17"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

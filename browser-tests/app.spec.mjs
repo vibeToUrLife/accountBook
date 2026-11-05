@@ -466,7 +466,19 @@ test("launch: theme and language applied before app.js arrives", async () => {
 // page began loading), and what was drawn when app.js said it was ready.
 const WATCH_SPLASH = `(${() => {
   const s = (window.__splash = {});
-  const firstFrame = () => (document.getElementById("splash") ? (s.shown = performance.now()) : requestAnimationFrame(firstFrame));
+  // How it looks: background, and how visible the colour layer and the logo are.
+  const look = () => {
+    const el = document.getElementById("splash"), st = getComputedStyle(el);
+    return {
+      bg: st.backgroundColor, image: st.backgroundImage.slice(0, 15),
+      colours: +getComputedStyle(el, "::before").opacity, logo: +getComputedStyle(el.querySelector(".splash-logo")).opacity,
+    };
+  };
+  const firstFrame = () => {
+    if (!document.getElementById("splash")) return requestAnimationFrame(firstFrame);
+    s.shown = performance.now();
+    s.first = look();
+  };
   requestAnimationFrame(firstFrame);
   document.addEventListener("app-ready", () => {
     s.ready = performance.now();
@@ -474,10 +486,12 @@ const WATCH_SPLASH = `(${() => {
   });
   new MutationObserver(() => {
     const c = document.documentElement.classList;
-    if (c.contains("splash-leaving") && s.leaving == null) s.leaving = performance.now();
+    if (c.contains("splash-leaving") && s.leaving == null) { s.leaving = performance.now(); s.atLeaving = look(); }
     if (c.contains("splash-gone") && s.gone == null) s.gone = performance.now();
   }).observe(document, { attributes: true, subtree: true, attributeFilter: ["class"] });
 }})();`;
+// Opened from the iPhone home screen.
+const IOS_APP = `Object.defineProperty(Navigator.prototype, "standalone", { get: () => true, configurable: true });`;
 
 test("launch screen: the logo first, gone once the records are drawn, never stuck", async () => {
   const check = checks();
@@ -486,6 +500,7 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
     ["signed in", { seed }, "Account Book"],
     ["signed in, Chinese", { seed, lang: "zh" }, "记账本"],
     ["signed out", { seed, init: WATCH_SPLASH + "window.__SIGNED_OUT = true;" }, "Account Book"],
+    ["iPhone home-screen app", { seed, init: WATCH_SPLASH + IOS_APP }, "Account Book"],
     // boot.js blocked too, so the page stays hidden for translation: the logo still shows.
     ["app.js doesn't load", { seed, lang: "zh", block: ["/app.js", "/js/boot.js"] }, "记账本"],
   ];
@@ -509,8 +524,15 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
 
       await page.waitForFunction(() => window.__splash.gone != null, null, { timeout: 8000 });
       const s = await page.evaluate(() => ({ ...window.__splash, inDom: !!document.getElementById("splash"), signIn: !document.getElementById("authCard").hidden }));
-      const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v) : v));
+      const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v * 100) / 100 : v));
       check(`${label}: taken out of the page after its fade`, !s.inDom && s.gone - s.leaving >= 550, t);
+      if (label === "iPhone home-screen app") {
+        // Same plain white as the iOS launch image and the frame iOS shows before the page draws.
+        check(`${label}: the first frame is plain white`, s.first.bg === "rgb(255, 255, 255)" && s.first.image === "none" && s.first.colours < 0.1 && s.first.logo < 0.1, t);
+        check(`${label}: then the colours and the logo fade in`, s.atLeaving.colours === 1 && s.atLeaving.logo === 1, t);
+      } else {
+        check(`${label}: colours and logo from the first frame`, s.first.image === "radial-gradient" && s.first.logo === 1, t);
+      }
       if (label === "app.js doesn't load") {
         check(`${label}: goes by itself ~4 s after it appeared`, s.ready == null && s.leaving - s.shown >= 3900 && s.leaving - s.shown < 4600, t);
       } else {
@@ -520,6 +542,29 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
         else check(`${label}: the records are drawn before it goes`, s.rowsAtReady >= 1, t);
         check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
       }
+    } finally {
+      await ctx.close();
+    }
+  }
+  check.done();
+});
+
+test("Google sign-in: the iPhone home-screen app opens Google in the app, a browser uses the popup", async () => {
+  const check = checks();
+  // A home-screen app can't get a popup's result back (it ended in "Something went
+  // wrong" and a second password), so there it must go straight to the redirect.
+  for (const [label, init, expected] of [
+    ["browser", "window.__SIGNED_OUT = true;", "popup"],
+    ["iPhone home-screen app", "window.__SIGNED_OUT = true;" + IOS_APP, "redirect"],
+  ]) {
+    const { ctx, page, errors } = await openApp(browser, base, { seed: formSeed, init, waitSignedIn: false });
+    try {
+      await page.waitForFunction(() => !document.getElementById("authCard").hidden);
+      await page.click("#googleBtn");
+      await page.waitForFunction(() => (window.__authCalls || []).length > 0, null, { timeout: 5000 });
+      const calls = await page.evaluate(() => window.__authCalls);
+      check(`${label}: signs in with the ${expected} only`, calls.join() === expected, calls.join());
+      check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
     } finally {
       await ctx.close();
     }

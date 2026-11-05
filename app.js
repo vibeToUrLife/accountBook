@@ -4,10 +4,10 @@ import {
   signOutUser,
   signUpWithEmailPassword,
   signInWithEmailPassword,
-  signInWithGooglePopup,
+  signInWithGoogle,
   userCollections,
   firestoreApi,
-} from "./firebase.js?v=2";
+} from "./firebase.js?v=3";
 
 import {
   todayISO,
@@ -4614,7 +4614,7 @@ function wireEvents() {
     setAuthError("");
     await withAuthButtonsDisabled(async () => {
       try {
-        await signInWithGooglePopup();
+        await signInWithGoogle();
       } catch (e) {
         setAuthError(friendlyAuthError(e));
       }
