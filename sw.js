@@ -1,11 +1,12 @@
-const CACHE_NAME = "accountbook-v27";
+const CACHE_NAME = "accountbook-v28";
 const CDN_CACHE = "accountbook-cdn-v16";
 // The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
 // /index.html with a 308 to /, and a page load can't be answered with a cached
 // redirect (Safari: "Response served by service worker has redirections").
 const SHELL = "./";
-// How long a page load waits for the network before using the cached shell.
-const NAV_TIMEOUT_MS = 1500;
+// How long a page load waits for the network before using the cached shell. Kept
+// short: the launch screen can't appear before the page does.
+const NAV_TIMEOUT_MS = 800;
 // Versioned like the imports in app.js, so a cached copy never mixes with
 // files from another release.
 const PRECACHE = [

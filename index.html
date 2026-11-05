@@ -106,11 +106,11 @@
         color: #fff;
         visibility: visible; /* html.i18n-pending hides the rest of the page, not this */
         -webkit-user-select: none; user-select: none;
-        transition: opacity 0.5s ease;
+        transition: opacity 0.3s ease;
         /* Safety net that needs no script: gone after 8 s, whatever happens. */
         animation: splash-timeout 0.4s ease 8s forwards;
       }
-      .splash-logo { width: 168px; height: 168px; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
+      .splash-logo { width: 168px; height: 168px; transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
       .splash-name {
         margin: 18px 0 0; height: 30px; color: #fff;
         font: 700 22px/30px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
@@ -131,9 +131,9 @@
       html.ios-app .splash::before {
         content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; z-index: -1;
         background: var(--splash-colours);
-        opacity: 0; animation: splash-fade-in 0.35s ease-out forwards;
+        opacity: 0; animation: splash-fade-in 0.25s ease-out forwards;
       }
-      html.ios-app .splash-logo { opacity: 0; animation: splash-fade-in 0.35s ease-out forwards; }
+      html.ios-app .splash-logo { opacity: 0; animation: splash-fade-in 0.25s ease-out forwards; }
       html.splash-leaving .splash { opacity: 0; pointer-events: none; }
       html.splash-leaving .splash-logo { transform: scale(1.08); }
       html.splash-gone .splash { display: none; }
@@ -209,7 +209,7 @@
       // reload and shows where start-up is (it goes by itself if the app then shows up).
       // Firebase itself waits up to 15 s on phones before giving up on a step.
       (function () {
-        var SPLASH_MIN_MS = 1200, SPLASH_MAX_MS = 4000, SPLASH_GIVE_UP_MS = 15000;
+        var SPLASH_MIN_MS = 800, SPLASH_MAX_MS = 4000, SPLASH_GIVE_UP_MS = 15000;
         var root = document.documentElement, ready = false, shownAt = null, done = false;
         var splash = document.getElementById("splash");
         splash.style.animation = "none"; // its CSS-only time limit is for when no script runs at all
@@ -241,7 +241,7 @@
             root.classList.add("splash-gone");
             var el = document.getElementById("splash");
             if (el) el.remove();
-          }, 600);
+          }, 350);
         }
         function hideWhenDue() {
           if (ready && shownAt !== null) setTimeout(hide, Math.max(0, shownAt + SPLASH_MIN_MS - performance.now()));

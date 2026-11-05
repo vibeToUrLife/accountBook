@@ -525,7 +525,7 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
       await page.waitForFunction(() => window.__splash.gone != null, null, { timeout: 12000 });
       const s = await page.evaluate(() => ({ ...window.__splash, inDom: !!document.getElementById("splash"), signIn: !document.getElementById("authCard").hidden }));
       const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v * 100) / 100 : v));
-      check(`${label}: taken out of the page after its fade`, !s.inDom && s.gone - s.leaving >= 550, t);
+      check(`${label}: taken out of the page after its fade`, !s.inDom && s.gone - s.leaving >= 300, t);
       if (label === "iPhone home-screen app") {
         // Same plain white as the iOS launch image and the frame iOS shows before the page draws.
         check(`${label}: the first frame is plain white`, s.first.bg === "rgb(255, 255, 255)" && s.first.image === "none" && s.first.colours < 0.1 && s.first.logo < 0.1, t);
@@ -533,12 +533,12 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
       } else {
         check(`${label}: colours and logo from the first frame`, s.first.image === "radial-gradient" && s.first.logo === 1, t);
       }
-      check(`${label}: on screen at least ~1.2 s, so it doesn't just flash by`, s.leaving - s.shown >= 1150, t);
+      check(`${label}: on screen at least ~0.8 s, so it doesn't just flash by`, s.leaving - s.shown >= 750, t);
       check(`${label}: the app is drawn underneath when it goes`, s.atLeaving.ui, t);
       if (label === "Firebase Auth answers after 6 s") {
         check(`${label}: waits for it (no page with only the header at 4 s), then goes`, s.leaving > 6000 && s.leaving < 7000, t);
       } else {
-        check(`${label}: goes right after that once the app is ready`, s.ready != null && s.leaving - Math.max(s.ready, s.shown + 1200) < 300, t);
+        check(`${label}: goes right after that once the app is ready`, s.ready != null && s.leaving - Math.max(s.ready, s.shown + 800) < 300, t);
         if (label === "signed out") check(`${label}: the sign-in form is what's underneath`, s.signIn, t);
         else check(`${label}: the records are drawn before it goes`, s.rowsAtReady >= 1, t);
       }
