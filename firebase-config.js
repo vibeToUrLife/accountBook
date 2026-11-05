@@ -7,8 +7,10 @@ export const firebaseConfig = {
   appId: "1:152621770538:web:70fa2a7c530b76019fa053",
 };
 
-// Hosts where vercel.json proxies Firebase's sign-in helper (/__/auth/) through the
-// site itself. There the iPhone home-screen app signs in through the site's own host
-// (see js/auth-domain.js). Each host needs https://<host>/__/auth/handler among the
-// "Authorized redirect URIs" of the Web OAuth client in Google Cloud Console.
-export const sameSiteAuthHosts = ["accbook.vercel.app"];
+// Google sign-in in the iPhone home-screen app goes to Google directly (see
+// js/google-signin.js) with this OAuth client, the "Web client (auto created by Google
+// Service)" that Firebase's Google sign-in uses (an ID, not a secret). It comes back to
+// https://<host>/__/auth/handler, so it is used only on these hosts, and each must have
+// that address among the client's "Authorized redirect URIs" in Google Cloud Console.
+export const googleWebClientId = "152621770538-uq82t2jcpt5dghp2nudr8qeen7o4ubtc.apps.googleusercontent.com";
+export const googleRedirectHosts = ["accbook.vercel.app"];

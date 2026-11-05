@@ -1,6 +1,6 @@
-// The service worker must leave Google sign-in's helper pages (/__/, proxied to
-// Firebase by vercel.json) alone: answered as a page load, the helper would be
-// cached as the app shell, or replaced by the shell when the network is slow.
+// The service worker must leave /__/ alone (/__/auth/handler is where Google sign-in
+// comes back with its token): answered as a page load, that page would be cached as
+// the app shell, or replaced by the shell when the network is slow.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -30,7 +30,7 @@ function answers(handler, path, mode = "no-cors") {
   return answered;
 }
 
-test("sign-in helper pages go straight to the network", () => {
+test("the sign-in return page and other /__/ paths go straight to the network", () => {
   const onFetch = loadFetchHandler();
   assert.equal(answers(onFetch, "/__/auth/handler?apiKey=x&authType=signInViaRedirect", "navigate"), false);
   assert.equal(answers(onFetch, "/__/auth/iframe?apiKey=x", "navigate"), false);

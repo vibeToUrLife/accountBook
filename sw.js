@@ -1,4 +1,4 @@
-const CACHE_NAME = "accountbook-v26";
+const CACHE_NAME = "accountbook-v27";
 const CDN_CACHE = "accountbook-cdn-v16";
 // The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
 // /index.html with a 308 to /, and a page load can't be answered with a cached
@@ -11,12 +11,12 @@ const NAV_TIMEOUT_MS = 1500;
 const PRECACHE = [
   SHELL,
   "./styles.css?v=17",
-  "./app.js?v=19",
+  "./app.js?v=20",
   "./js/boot.js?v=2",
   "./utils.js?v=7",
-  "./firebase.js?v=5",
-  "./firebase-config.js?v=2",
-  "./js/auth-domain.js?v=1",
+  "./firebase.js?v=6",
+  "./firebase-config.js?v=3",
+  "./js/google-signin.js?v=1",
   "./js/i18n.js?v=3",
   "./js/i18n.zh.js?v=4",
   "./js/backup.js?v=1",
@@ -64,9 +64,9 @@ self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET") return; // never touch writes (Firestore POST/PATCH)
   const url = new URL(e.request.url);
 
-  // Google sign-in's helper pages, which vercel.json proxies to Firebase: straight to
-  // the network, never cached. (Handled as a page load, the helper page would be
-  // stored as the app shell, or answered with the shell when the network is slow.)
+  // /__/auth/handler, where Google sign-in comes back with its token: straight to the
+  // network, never cached. (Handled as a page load, it would be stored as the app
+  // shell, or answered with the shell when the network is slow.)
   if (url.origin === location.origin && url.pathname.startsWith("/__/")) return;
 
   // Cross-origin: only cache known static CDN libraries/fonts.

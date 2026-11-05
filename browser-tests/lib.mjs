@@ -16,14 +16,18 @@ const TYPES = {
   ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon",
 };
 
-/** Serve the repository like the live site (plain files, "/" → index.html). */
+/** Serve the repository like the live site (plain files, "/" → index.html, "/x" → x.html as Vercel's cleanUrls does). */
 export function startServer() {
   const server = http.createServer(async (req, res) => {
     const { pathname } = new URL(req.url, "http://localhost");
-    const file = path.join(ROOT, pathname === "/" ? "index.html" : decodeURIComponent(pathname));
+    let file = path.join(ROOT, pathname === "/" ? "index.html" : decodeURIComponent(pathname));
     if (!file.startsWith(ROOT)) return res.writeHead(403).end();
     try {
-      const body = await readFile(file);
+      const body = await readFile(file).catch(async (e) => {
+        if (path.extname(file)) throw e;
+        file += ".html";
+        return readFile(file);
+      });
       res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "application/octet-stream", "Cache-Control": "no-store" });
       res.end(body);
     } catch {
@@ -49,7 +53,7 @@ export const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAA
  */
 export async function openApp(browser, base, {
   seed = [], stale = null, now = "2026-10-31T10:00:00+08:00", lang = "en", theme = "light",
-  local = {}, block = [], init = null, width = 393, waitSignedIn = true,
+  local = {}, block = [], init = null, width = 393, waitSignedIn = true, path: at = "", routes = [],
 } = {}) {
   const ctx = await browser.newContext({
     viewport: { width, height: 852 }, timezoneId: "Asia/Kuala_Lumpur", serviceWorkers: "block",
@@ -70,6 +74,8 @@ export async function openApp(browser, base, {
     if (url.hostname === "127.0.0.1") return route.continue();
     return route.abort(); // fonts and CDNs: tests run without the network
   });
+  // Extra [pattern, handler] routes, which take precedence over the one above.
+  for (const [pattern, handler] of routes) await ctx.route(pattern, handler);
   await ctx.addInitScript(({ seed, stale, lang, theme, local }) => {
     window.__SEED = seed;
     if (stale) window.__STALE = stale;
@@ -84,7 +90,7 @@ export async function openApp(browser, base, {
   const page = await ctx.newPage();
   const errors = [];
   page.on("pageerror", (e) => errors.push(String(e)));
-  await page.goto(base, { waitUntil: "domcontentloaded" });
+  await page.goto(base + at, { waitUntil: "domcontentloaded" });
   if (waitSignedIn) await signedIn(page);
   return { ctx, page, errors, requests };
 }

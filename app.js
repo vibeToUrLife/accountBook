@@ -7,7 +7,7 @@ import {
   signInWithGoogle,
   userCollections,
   firestoreApi,
-} from "./firebase.js?v=5";
+} from "./firebase.js?v=6";
 
 import {
   todayISO,

@@ -568,7 +568,7 @@ test("launch screen: when the app can't start, it says so and offers a reload (n
       }));
       check(`${label}: still the logo (loading) at 5 s, not an empty page`, mid.logo && !mid.problem, JSON.stringify(mid));
 
-      await page.waitForFunction(() => document.documentElement.classList.contains("splash-failed"), null, { timeout: 9000 });
+      await page.waitForFunction(() => document.documentElement.classList.contains("splash-failed"), null, { timeout: 14000 });
       const r = await page.evaluate(() => {
         const visible = (el) => !!el && el.offsetParent !== null, splash = document.getElementById("splash");
         const shownText = (sel) => [...document.querySelectorAll(sel)].filter(visible).map((el) => el.textContent).join();
@@ -579,7 +579,7 @@ test("launch screen: when the app can't start, it says so and offers a reload (n
           covers: splash.contains(document.elementFromPoint(innerWidth / 2, innerHeight / 2)), ariaHidden: splash.getAttribute("aria-hidden"),
         };
       });
-      check(`${label}: after ~10 s it says the app didn't load, with a Reload button`, r.after >= 9900 && r.message.length > 10 && /^(Reload|重新加载)$/.test(r.button), JSON.stringify(r));
+      check(`${label}: after ~15 s it says it's taking longer than usual, with a Reload button`, r.after >= 14900 && r.message.length > 10 && /^(Reload|重新加载)$/.test(r.button), JSON.stringify(r));
       check(`${label}: still covering the page, and now read out by screen readers`, r.covers && r.ariaHidden === null, JSON.stringify(r));
       check(`${label}: it says where start-up stopped`, failed.test(r.error), r.error);
 
@@ -606,56 +606,101 @@ test("Firebase Auth keeps the session in localStorage, not IndexedDB (which iOS 
   check.done();
 });
 
-test("Google sign-in: the iPhone home-screen app opens Google in the app, a browser uses the popup", async () => {
-  const check = checks();
-  // A home-screen app can't get a popup's result back (it ended in "Something went
-  // wrong" and a second password), so there it must go straight to the redirect.
-  for (const [label, init, expected] of [
-    ["browser", "window.__SIGNED_OUT = true;", "popup"],
-    ["iPhone home-screen app", "window.__SIGNED_OUT = true;" + IOS_APP, "redirect"],
-  ]) {
-    const { ctx, page, errors } = await openApp(browser, base, { seed: formSeed, init, waitSignedIn: false });
-    try {
-      await page.waitForFunction(() => !document.getElementById("authCard").hidden);
-      await page.click("#googleBtn");
-      await page.waitForFunction(() => (window.__authCalls || []).length > 0, null, { timeout: 5000 });
-      const { calls, pending } = await page.evaluate(() => ({ calls: window.__authCalls, pending: localStorage.getItem("accountBook.googleRedirect") }));
-      check(`${label}: signs in with the ${expected} only`, calls.join() === expected, calls.join());
-      check(`${label}: ${expected === "redirect" ? "notes" : "doesn't note"} that it left for Google's page`, (pending === "1") === (expected === "redirect"), String(pending));
-      check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
-    } finally {
-      await ctx.close();
-    }
-  }
-  check.done();
-});
+// The live site's host stands in for this test server's in firebase-config.js, so the
+// home-screen app signs in by going to Google directly here too.
+const directGoogleHere = (base) => [["**/firebase-config.js*", async (route) => {
+  const response = await route.fetch();
+  const host = new URL(base).host;
+  route.fulfill({ response, body: (await response.text()).replace('["accbook.vercel.app"]', `["accbook.vercel.app", "${host}"]`) });
+}]];
+// A Google ID token as Google would send it (the app only reads its claims; Firebase checks it).
+const idToken = (claims) => ["{\"alg\":\"RS256\"}", JSON.stringify(claims)].map((p) => Buffer.from(p).toString("base64url")).join(".") + ".sig";
+const NOW = Date.parse("2026-10-31T10:00:00+08:00"); // openApp's fixed clock
 
-test("Google sign-in that comes back without a result says so, instead of a silent sign-in form", async () => {
+test("Google sign-in in the iPhone home-screen app: off to Google, back with a token, signed in", async () => {
   const check = checks();
-  // Back from Google's page (the note is set), but there's no result and no user.
+  const asked = [];
+  // Stand-in for Google: notes what it was asked, then sends the user back with a token.
+  const google = ["https://accounts.google.com/**", (route) => {
+    const url = new URL(route.request().url());
+    asked.push(url);
+    const q = url.searchParams;
+    const back = `${q.get("redirect_uri")}#id_token=${idToken({ nonce: q.get("nonce"), email: "lowky999@gmail.com" })}&state=${q.get("state")}&authuser=0`;
+    route.fulfill({ status: 302, headers: { location: back } });
+  }];
   const { ctx, page, errors } = await openApp(browser, base, {
-    seed: formSeed, init: "window.__SIGNED_OUT = true;" + IOS_APP, local: { "accountBook.googleRedirect": "1" }, waitSignedIn: false,
+    seed: formSeed, init: "window.__SIGNED_OUT = true;" + IOS_APP, routes: [...directGoogleHere(base), google], waitSignedIn: false,
   });
   try {
     await page.waitForFunction(() => !document.getElementById("authCard").hidden);
+    await page.click("#googleBtn");
+    // Through Google and /__/auth/handler and back: wait for the app itself, signed in.
+    await page.waitForFunction(() => {
+      const box = document.getElementById("appContent");
+      return location.pathname === "/" && !!box && !box.hidden;
+    }, null, { timeout: 10000 });
+    const q = asked[0]?.searchParams;
+    check("goes to Google once, for an ID token for Firebase's web client", asked.length === 1 && q.get("response_type") === "id_token"
+      && q.get("client_id") === "152621770538-uq82t2jcpt5dghp2nudr8qeen7o4ubtc.apps.googleusercontent.com"
+      && q.get("scope") === "openid email profile" && /^[0-9a-f]{32}$/.test(q.get("state")) && /^[0-9a-f]{32}$/.test(q.get("nonce")), asked.map(String).join(" | "));
+    check("comes back to /__/auth/handler on this site", q?.get("redirect_uri") === new URL("__/auth/handler", base).href, q?.get("redirect_uri"));
     const r = await page.evaluate(() => ({
-      error: document.getElementById("authError").hidden ? "" : document.getElementById("authError").textContent,
-      pending: localStorage.getItem("accountBook.googleRedirect"),
+      calls: window.__authCalls || [], url: location.href, status: document.getElementById("authStatus").textContent,
+      left: ["accountBook.googleSignIn", "accountBook.googleReturn"].filter((k) => localStorage.getItem(k) !== null),
     }));
-    check("the sign-in screen says Google sign-in didn't finish", /didn't finish/.test(r.error), r.error);
-    check("the note is cleared, so it's said once", r.pending === null, String(r.pending));
+    check("signs in to Firebase with Google's token, not the popup or Firebase's redirect", r.calls.length === 1 && r.calls[0].startsWith("credential:") && r.calls[0].includes("."), r.calls.join());
+    check("signed in, back on the app's own address (the token isn't left in it)", /Signed in/.test(r.status) && r.url === base, `${r.status} | ${r.url}`);
+    check("nothing about the sign-in is left in storage", r.left.length === 0, r.left.join());
     check("no page errors", errors.length === 0, errors.join(" | "));
   } finally {
     await ctx.close();
   }
-  // A normal launch (no note) shows no such message.
-  const plain = await openApp(browser, base, { seed: formSeed, init: "window.__SIGNED_OUT = true;" + IOS_APP, waitSignedIn: false });
+
+  // A browser keeps Firebase's popup.
+  const tab = await openApp(browser, base, { seed: formSeed, init: "window.__SIGNED_OUT = true;", routes: directGoogleHere(base), waitSignedIn: false });
   try {
-    await plain.page.waitForFunction(() => !document.getElementById("authCard").hidden);
-    const shown = await plain.page.evaluate(() => !document.getElementById("authError").hidden);
-    check("a normal launch shows no sign-in error", !shown);
+    await tab.page.waitForFunction(() => !document.getElementById("authCard").hidden);
+    await tab.page.click("#googleBtn");
+    await tab.page.waitForFunction(() => (window.__authCalls || []).length > 0, null, { timeout: 5000 });
+    const calls = await tab.page.evaluate(() => window.__authCalls);
+    check("a browser signs in with Firebase's popup", calls.join() === "popup", calls.join());
   } finally {
-    await plain.ctx.close();
+    await tab.ctx.close();
+  }
+  check.done();
+});
+
+test("Google sign-in that doesn't come back right says so and signs nobody in", async () => {
+  const check = checks();
+  const pending = JSON.stringify({ state: "s1", nonce: "n1", at: NOW });
+  const cases = [
+    // Left for Google, came back without finishing (e.g. tapped Done).
+    ["came back without finishing", { "accountBook.googleSignIn": pending }, true],
+    // A token that doesn't answer this app's request is refused.
+    ["a token for someone else's request", { "accountBook.googleSignIn": pending, "accountBook.googleReturn": `id_token=${idToken({ nonce: "n1" })}&state=other` }, true],
+    ["a replayed token (wrong nonce)", { "accountBook.googleSignIn": pending, "accountBook.googleReturn": `id_token=${idToken({ nonce: "old" })}&state=s1` }, true],
+    ["Google refused", { "accountBook.googleSignIn": pending, "accountBook.googleReturn": "error=access_denied&state=s1" }, true],
+    // Firebase's own redirect (browsers whose popups are blocked) without a result.
+    ["a Firebase redirect without a result", { "accountBook.googleRedirect": "1" }, true],
+    // Started an hour ago and never finished: old news, nothing to say.
+    ["an old unfinished sign-in", { "accountBook.googleSignIn": JSON.stringify({ state: "s1", nonce: "n1", at: NOW - 3600e3 }) }, false],
+    ["a normal launch", {}, false],
+  ];
+  for (const [label, local, says] of cases) {
+    // The note is written before each page load; only the first load matters here.
+    const { ctx, page, errors } = await openApp(browser, base, { seed: formSeed, init: "window.__SIGNED_OUT = true;" + IOS_APP, local, waitSignedIn: false });
+    try {
+      await page.waitForFunction(() => !document.getElementById("authCard").hidden || !document.getElementById("appContent").hidden);
+      const r = await page.evaluate(() => ({
+        error: document.getElementById("authError").hidden ? "" : document.getElementById("authError").textContent,
+        calls: window.__authCalls || [], signedIn: !document.getElementById("appContent").hidden,
+      }));
+      check(`${label}: nobody is signed in`, r.calls.length === 0 && !r.signedIn, r.calls.join());
+      check(`${label}: ${says ? "says Google sign-in didn't finish" : "says nothing"}`, says ? /didn't finish/.test(r.error) : r.error === "", r.error);
+      check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
+    } finally {
+      await ctx.close();
+    }
   }
   check.done();
 });

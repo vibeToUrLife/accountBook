@@ -158,7 +158,7 @@
     <link rel="stylesheet" href="./styles.css?v=17" />
     <!-- Start downloading the Firebase SDK right away; otherwise it is only found
          after app.js and firebase.js have been fetched and parsed. -->
-    <link rel="modulepreload" href="./firebase.js?v=5" />
+    <link rel="modulepreload" href="./firebase.js?v=6" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js" />
@@ -193,7 +193,7 @@
       <p class="splash-name"><span lang="en">Account Book</span><span lang="zh-CN">记账本</span></p>
       <span class="splash-dots"><i></i><i></i><i></i></span>
       <div class="splash-problem" role="alert">
-        <p><span lang="en">The app didn't load. Check your connection, then reload.</span><span lang="zh-CN">没能加载出来，请检查网络后重新加载。</span></p>
+        <p><span lang="en">This is taking longer than usual. Wait a little longer, or reload.</span><span lang="zh-CN">加载得比平常久，可以再等一下，或者重新加载。</span></p>
         <button type="button" class="splash-reload" onclick="location.reload()"><span lang="en">Reload</span><span lang="zh-CN">重新加载</span></button>
         <p class="splash-error" id="splashError"></p>
       </div>
@@ -206,9 +206,10 @@
       // sign-in form). After SPLASH_MAX_MS it goes as soon as the app shows anything
       // (records may still be loading), but never to uncover a page with only the
       // header: it waits, with its loading dots, and after SPLASH_GIVE_UP_MS offers a
-      // reload and shows what went wrong.
+      // reload and shows where start-up is (it goes by itself if the app then shows up).
+      // Firebase itself waits up to 15 s on phones before giving up on a step.
       (function () {
-        var SPLASH_MIN_MS = 1200, SPLASH_MAX_MS = 4000, SPLASH_GIVE_UP_MS = 10000;
+        var SPLASH_MIN_MS = 1200, SPLASH_MAX_MS = 4000, SPLASH_GIVE_UP_MS = 15000;
         var root = document.documentElement, ready = false, shownAt = null, done = false;
         var splash = document.getElementById("splash");
         splash.style.animation = "none"; // its CSS-only time limit is for when no script runs at all
@@ -1508,7 +1509,7 @@
     </div>
 
     <script type="module" src="./js/boot.js?v=2"></script>
-    <script type="module" src="./app.js?v=19"></script>
+    <script type="module" src="./app.js?v=20"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {

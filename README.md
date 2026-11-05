@@ -34,8 +34,8 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - Custom currency symbol
 - **Export** to CSV, JSON, and monthly PDF reports; **import** from JSON backup (restores records with their original ids, so links to categories survive and importing the same file twice doesn't duplicate anything; receipt photos are not part of the backup)
 - Installable **PWA** that works offline: the service worker caches the app shell and Firestore keeps a local copy of your data, so records load without a connection and changes made offline sync when you are back online (an "Offline" badge shows in the header)
-- Cloud sync via Firebase (Email/Password or Google sign-in + Firestore). The sign-in session is kept in localStorage rather than IndexedDB: on iPhone, IndexedDB can be closed under Firebase's first read when the page is hidden while it loads, and sign-in then never answers ([firebase-js-sdk #10311](https://github.com/firebase/firebase-js-sdk/issues/10311)). In the iPhone home-screen app, Google's sign-in page opens in the app itself (redirect), through the site's own domain; see [Google sign-in in the iPhone home-screen app](#google-sign-in-in-the-iphone-home-screen-app)
-- **Launch screen**: opening the app shows its logo full screen until the first screen is drawn (on screen at least 1.2 s), then fades into the app. After 4 s it goes as soon as the app shows anything, but it never uncovers a page with only the header: if nothing has appeared after 10 s it says the app didn't load, with a Reload button and where start-up stopped (e.g. `stuck at: sign-in check`, or a script that failed to load). On an iPhone home-screen app, iOS shows a white frame between its launch image and the page's first paint ([WebKit bug 311569](https://bugs.webkit.org/show_bug.cgi?id=311569)), so there the launch image (`icons/splash/`, plain white, one per iPhone screen size) and the page's first frame are white and the colours and logo fade in after it. iOS fetches the launch image when the app is added to the home screen, so re-add the app to pick up a new one
+- Cloud sync via Firebase (Email/Password or Google sign-in + Firestore). The sign-in session is kept in localStorage rather than IndexedDB: on iPhone, IndexedDB can be closed under Firebase's first read when the page is hidden while it loads, and sign-in then never answers ([firebase-js-sdk #10311](https://github.com/firebase/firebase-js-sdk/issues/10311)). In the iPhone home-screen app, Google's sign-in page opens in the app itself and the app signs in with the token it gets back; see [Google sign-in in the iPhone home-screen app](#google-sign-in-in-the-iphone-home-screen-app)
+- **Launch screen**: opening the app shows its logo full screen until the first screen is drawn (on screen at least 1.2 s), then fades into the app. After 4 s it goes as soon as the app shows anything, but it never uncovers a page with only the header: if nothing has appeared after 15 s it says loading is taking longer than usual, with a Reload button and where start-up is (it still goes by itself if the app then shows up) (e.g. `stuck at: sign-in check`, or a script that failed to load). On an iPhone home-screen app, iOS shows a white frame between its launch image and the page's first paint ([WebKit bug 311569](https://bugs.webkit.org/show_bug.cgi?id=311569)), so there the launch image (`icons/splash/`, plain white, one per iPhone screen size) and the page's first frame are white and the colours and logo fade in after it. iOS fetches the launch image when the app is added to the home screen, so re-add the app to pick up a new one
 
 ## Firebase setup
 1. Create a project at https://console.firebase.google.com/
@@ -58,11 +58,12 @@ Examples:
 Then redeploy and refresh.
 
 ### Google sign-in in the iPhone home-screen app
-A popup can't hand its result back to a home-screen app on iPhone, so there Google sign-in redirects: Google's page opens inside the app and comes back to it. Safari keeps a redirect's result only when Firebase's sign-in helper (`/__/auth/`) is on the site itself, so:
+A popup can't hand its result back to a home-screen app on iPhone, and Firebase's redirect needs its helper frame (`/__/auth/iframe` and Google's gapi script) to talk to the app when it comes back, which on iPhone never completed (Firebase waited 15 s, gave up and showed the sign-in form again). So the home-screen app signs in without Firebase's helper (`js/google-signin.js`):
 
-- `vercel.json` proxies `/__/auth/*` and `/__/firebase/*` to `accountbook-6e296.firebaseapp.com`, and the service worker leaves those paths alone.
-- On the hosts listed in `sameSiteAuthHosts` (`firebase-config.js`), the home-screen app uses the site's own host as `authDomain` (`js/auth-domain.js`). Browsers keep the popup and `firebaseapp.com`.
-- One-time setup for each such host, in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)" → Authorized redirect URIs: add `https://accbook.vercel.app/__/auth/handler` and save. Without it, Google answers the home-screen sign-in with "Error 400: redirect_uri_mismatch".
+- It goes to Google itself and asks for an ID token (OpenID Connect, `response_type=id_token`, with a `state` and a `nonce`), using Firebase's own web OAuth client (`googleWebClientId` in `firebase-config.js`).
+- Google sends the token back to `https://accbook.vercel.app/__/auth/handler` (`__/auth/handler.html`), which hands it to the app; the app checks `state` and `nonce` and signs in with `signInWithCredential`. The token stays in the URL fragment, so it never reaches the server; the service worker leaves `/__/` alone.
+- Only on the hosts in `googleRedirectHosts` (`firebase-config.js`). Browsers keep Firebase's popup.
+- One-time setup for each such host, in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)" (ID starting with the project number) → Authorized redirect URIs: add `https://accbook.vercel.app/__/auth/handler` and save. Without it, Google answers with "Error 400: redirect_uri_mismatch".
 
 ### Deploy note (important)
 This app loads Firebase settings from `./firebase-config.js` at runtime.
@@ -110,7 +111,7 @@ Browser checks drive the real app in Chromium on a phone-sized screen (UTC+8, fi
 - `js/i18n.js` / `js/i18n.zh.js` — translation layer and the Simplified Chinese dictionary (English text is the key)
 - `js/backup.js` — reads backup files for import (validates every field, keeps record ids)
 - `js/boot.js` — applies the saved language before the rest of the app (and the Firebase SDK) has loaded
-- `js/auth-domain.js` — recognises the iPhone home-screen app and picks where Google sign-in's helper pages live for it
+- `js/google-signin.js` / `__/auth/handler.html` — Google sign-in for the iPhone home-screen app (goes to Google directly; the page Google sends the token back to)
 - `vendor/chart.umd.js` — Chart.js 4.4.1 (MIT, unmodified), served from the site and loaded when Statistics or Dashboard opens
 - `js/features/` — feature modules (goals, upcoming, recurring, debts, subscriptions, templates, receipts)
 - `tests/` — unit tests for the pure feature logic
