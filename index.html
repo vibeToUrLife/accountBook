@@ -50,6 +50,25 @@
       // Before the first paint (app.js arrives later): apply the saved theme, and
       // when the language is Chinese hide the page until js/boot.js has translated
       // it, so it doesn't flash light / English first. The timer is a safety net.
+      // Start-up errors (scripts that failed to load, uncaught errors), shown on the
+      // launch screen if the app never comes up, so a screenshot says what went wrong.
+      // Fonts, images and stylesheets falling back aren't the app failing: not listed.
+      (function () {
+        var errors = (window.__startupErrors = []);
+        addEventListener("error", function (e) {
+          var t = e.target;
+          if (t && t !== window) {
+            if (t.tagName !== "SCRIPT" && !(t.tagName === "LINK" && t.rel === "modulepreload")) return;
+            errors.push("failed to load " + String(t.src || t.href).replace(location.origin + "/", "").replace(/^https?:\/\//, ""));
+          } else {
+            errors.push(String(e.message || "error"));
+          }
+        }, true);
+        addEventListener("unhandledrejection", function (e) {
+          var r = e.reason;
+          errors.push(String((r && (r.code || r.message)) || r));
+        });
+      })();
       (function () {
         var root = document.documentElement;
         // Opened from the iPhone/iPad home screen (added from Safari or Chrome).
@@ -98,7 +117,7 @@
         letter-spacing: 0.01em;
         opacity: 0; animation: splash-fade-in 0.45s ease-out 0.12s forwards;
       }
-      html[lang="zh-CN"] .splash-name [lang="en"], html:not([lang="zh-CN"]) .splash-name [lang="zh-CN"] { display: none; }
+      html[lang="zh-CN"] .splash [lang="en"], html:not([lang="zh-CN"]) .splash [lang="zh-CN"] { display: none; }
       /* Only shows when loading takes a while (longer than the logo's minimum time). */
       .splash-dots { display: flex; height: 6px; margin-top: 28px; opacity: 0; animation: splash-fade-in 0.4s ease-out 2s forwards; }
       .splash-dots i { width: 6px; height: 6px; margin: 0 4px; border-radius: 50%; background: #fff; animation: splash-dot 1.05s ease-in-out infinite; }
@@ -118,6 +137,13 @@
       html.splash-leaving .splash { opacity: 0; pointer-events: none; }
       html.splash-leaving .splash-logo { transform: scale(1.08); }
       html.splash-gone .splash { display: none; }
+      /* Shown instead of the dots when the app still hasn't drawn anything after a while. */
+      .splash-problem { display: none; max-width: 300px; margin-top: 26px; text-align: center; font: 500 15px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+      .splash-problem p { margin: 0; }
+      .splash-reload { margin-top: 16px; padding: 11px 26px; border-radius: 999px; border: 1.5px solid rgba(255, 255, 255, 0.85); background: rgba(255, 255, 255, 0.16); color: #fff; font: 600 15px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; cursor: pointer; }
+      .splash-problem .splash-error { margin-top: 14px; font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; opacity: 0.8; word-break: break-word; }
+      html.splash-failed .splash-problem { display: block; }
+      html.splash-failed .splash-dots { display: none; }
       @keyframes splash-fade-in { to { opacity: 1; } }
       @keyframes splash-dot { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
       @keyframes splash-timeout { to { opacity: 0; visibility: hidden; } }
@@ -132,7 +158,7 @@
     <link rel="stylesheet" href="./styles.css?v=17" />
     <!-- Start downloading the Firebase SDK right away; otherwise it is only found
          after app.js and firebase.js have been fetched and parsed. -->
-    <link rel="modulepreload" href="./firebase.js?v=4" />
+    <link rel="modulepreload" href="./firebase.js?v=5" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js" />
     <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js" />
@@ -166,16 +192,46 @@
       </svg>
       <p class="splash-name"><span lang="en">Account Book</span><span lang="zh-CN">记账本</span></p>
       <span class="splash-dots"><i></i><i></i><i></i></span>
+      <div class="splash-problem" role="alert">
+        <p><span lang="en">The app didn't load. Check your connection, then reload.</span><span lang="zh-CN">没能加载出来，请检查网络后重新加载。</span></p>
+        <button type="button" class="splash-reload" onclick="location.reload()"><span lang="en">Reload</span><span lang="zh-CN">重新加载</span></button>
+        <p class="splash-error" id="splashError"></p>
+      </div>
     </div>
     <script>
       // Launch screen timing, counted from the first frame that shows the logo (on a
       // phone the page itself takes a moment to arrive, so counting from the start of
-      // loading would leave the logo only a flash). It stays at least SPLASH_MIN_MS,
+      // loading would leave the logo only a flash). It stays at least SPLASH_MIN_MS and
       // goes once app.js fires "app-ready" (its first screen is drawn: records, or the
-      // sign-in form), and goes after SPLASH_MAX_MS even if the app is still waiting.
+      // sign-in form). After SPLASH_MAX_MS it goes as soon as the app shows anything
+      // (records may still be loading), but never to uncover a page with only the
+      // header: it waits, with its loading dots, and after SPLASH_GIVE_UP_MS offers a
+      // reload and shows what went wrong.
       (function () {
-        var SPLASH_MIN_MS = 1200, SPLASH_MAX_MS = 4000;
+        var SPLASH_MIN_MS = 1200, SPLASH_MAX_MS = 4000, SPLASH_GIVE_UP_MS = 10000;
         var root = document.documentElement, ready = false, shownAt = null, done = false;
+        var splash = document.getElementById("splash");
+        splash.style.animation = "none"; // its CSS-only time limit is for when no script runs at all
+        function appShown() {
+          return ["authCard", "appContent", "configCard"].some(function (id) {
+            var el = document.getElementById(id);
+            return el && !el.hidden;
+          });
+        }
+        function showProblem() {
+          if (root.classList.contains("splash-failed")) return;
+          root.classList.add("splash-failed");
+          splash.removeAttribute("aria-hidden");
+          var stage = window.__startupStage, errors = (window.__startupErrors || []).slice(0, 3);
+          var detail = [stage ? "stuck at: " + stage : "app.js didn't start"].concat(errors).join(" · ");
+          document.getElementById("splashError").textContent = detail.length > 240 ? detail.slice(0, 240) + "…" : detail;
+        }
+        function waitForApp() {
+          if (done) return;
+          if (appShown()) return hide();
+          if (performance.now() - shownAt >= SPLASH_GIVE_UP_MS) showProblem();
+          setTimeout(waitForApp, 250);
+        }
         function hide() {
           if (done) return;
           done = true;
@@ -192,7 +248,7 @@
         document.addEventListener("app-ready", function () { ready = true; hideWhenDue(); });
         requestAnimationFrame(function () {
           shownAt = performance.now();
-          setTimeout(hide, SPLASH_MAX_MS);
+          setTimeout(waitForApp, SPLASH_MAX_MS);
           hideWhenDue();
         });
       })();
@@ -1452,7 +1508,7 @@
     </div>
 
     <script type="module" src="./js/boot.js?v=2"></script>
-    <script type="module" src="./app.js?v=18"></script>
+    <script type="module" src="./app.js?v=19"></script>
     <script>
       // Desktop sidebar close – inline fallback
       document.addEventListener("DOMContentLoaded", () => {
