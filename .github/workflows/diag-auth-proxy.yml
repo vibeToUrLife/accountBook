@@ -1,6 +1,5 @@
-# One-off diagnosis (throwaway branch, never merged): does Vercel serve the new
-# Google sign-in return page at /__/auth/handler (preview of google-signin-direct,
-# and production once merged)?
+# One-off diagnosis (throwaway branch, never merged): is the new Google sign-in
+# return page live at /__/auth/handler, and does it hand the token to the app?
 name: Diagnose sign-in proxy
 on:
   push:
@@ -9,15 +8,21 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
-      - name: Fetch /__/auth/handler
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Wait for the deploy, then fetch /__/auth/handler
         run: |
-          for host in accountbook-git-google-signin-direct-lowky.vercel.app accbook.vercel.app; do
-            u="https://$host/__/auth/handler"
-            echo "=================== $u"
-            curl -sS -o body.txt -D headers.txt -w "status %{http_code} | type %{content_type} | bytes %{size_download}\n" "$u" || true
-            grep -iE "^(server|location|x-vercel-cache):" headers.txt || true
-            grep -c "accountBook.googleReturn" body.txt | sed 's/^/new return page markers: /'
-            grep -c "handler.js" body.txt | sed 's/^/firebase helper markers: /'
-            grep -c 'id="splash"' body.txt | sed 's/^/app page markers: /'
-            head -c 200 body.txt; echo
+          for i in $(seq 1 20); do
+            curl -sS -o body.txt -w "try $i: status %{http_code} | bytes %{size_download}\n" "https://accbook.vercel.app/__/auth/handler" || true
+            if grep -q "accountBook.googleReturn" body.txt; then echo "NEW RETURN PAGE IS LIVE"; cat body.txt; exit 0; fi
+            sleep 15
           done
+          echo "new return page not live after 5 minutes; got:"; head -c 400 body.txt; exit 1
+      - name: Install the browser
+        working-directory: browser-tests
+        run: npm ci && npx playwright install --with-deps chromium
+      - name: The return page hands the token to the app
+        working-directory: browser-tests
+        run: node ../.github/diag/handler-check.mjs
