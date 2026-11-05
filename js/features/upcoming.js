@@ -50,7 +50,7 @@ function recordedOn(rule, dateISO, transactions) {
   );
 }
 
-import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=3"; // query must match app.js so both share one module instance
 export function computeUpcoming({ subscriptions = [], debts = [], recurringRules = [], transactions = [], today, horizonDays = 14 }) {
   const horizonEnd = addDaysISO(today, horizonDays);
   const items = [];

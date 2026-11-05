@@ -7,7 +7,7 @@ import {
   signInWithGoogle,
   userCollections,
   firestoreApi,
-} from "./firebase.js?v=3";
+} from "./firebase.js?v=4";
 
 import {
   todayISO,
@@ -28,15 +28,15 @@ import {
   monthlyBudgetFor,
 } from "./utils.js?v=7";
 
-import { createDebts } from "./js/features/debts.js?v=2";
-import { createSubscriptions } from "./js/features/subscriptions.js?v=2";
-import { createGoals } from "./js/features/goals.js?v=3";
-import { createTargets } from "./js/features/targets.js?v=2";
-import { createTemplates } from "./js/features/templates.js?v=3";
-import { createReceipts } from "./js/features/receipts.js?v=3";
-import { createRecurring } from "./js/features/recurring.js?v=2";
-import { createUpcoming } from "./js/features/upcoming.js?v=2";
-import { t, initLang, getLang, setLang, translateDom, locale } from "./js/i18n.js?v=2";
+import { createDebts } from "./js/features/debts.js?v=3";
+import { createSubscriptions } from "./js/features/subscriptions.js?v=3";
+import { createGoals } from "./js/features/goals.js?v=4";
+import { createTargets } from "./js/features/targets.js?v=3";
+import { createTemplates } from "./js/features/templates.js?v=4";
+import { createReceipts } from "./js/features/receipts.js?v=4";
+import { createRecurring } from "./js/features/recurring.js?v=3";
+import { createUpcoming } from "./js/features/upcoming.js?v=3";
+import { t, initLang, getLang, setLang, translateDom, locale } from "./js/i18n.js?v=3";
 import { parseBackup, exportRecord, cleanCurrencySymbol } from "./js/backup.js?v=1";
 
 const {
@@ -1624,6 +1624,7 @@ function friendlyAuthError(err) {
   if (code === "auth/email-already-in-use") return t("Email already in use. Try signing in.");
   if (code === "auth/weak-password") return t("Password is too weak (min 6 characters).");
   if (code === "auth/popup-closed-by-user") return t("Google sign-in popup was closed.");
+  if (code === "auth/redirect-incomplete") return t("Google sign-in didn't finish. Please try again.");
   if (code === "auth/popup-blocked") return t("Google sign-in popup was blocked by the browser. Try again or use a normal browser (Chrome/Safari).");
   if (code === "auth/operation-not-supported-in-this-environment") {
     return t("Google sign-in is not supported in this browser (common in in-app browsers). Open the site in Chrome/Safari and try again.");

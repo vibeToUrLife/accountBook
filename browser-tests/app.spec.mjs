@@ -562,12 +562,43 @@ test("Google sign-in: the iPhone home-screen app opens Google in the app, a brow
       await page.waitForFunction(() => !document.getElementById("authCard").hidden);
       await page.click("#googleBtn");
       await page.waitForFunction(() => (window.__authCalls || []).length > 0, null, { timeout: 5000 });
-      const calls = await page.evaluate(() => window.__authCalls);
+      const { calls, pending } = await page.evaluate(() => ({ calls: window.__authCalls, pending: localStorage.getItem("accountBook.googleRedirect") }));
       check(`${label}: signs in with the ${expected} only`, calls.join() === expected, calls.join());
+      check(`${label}: ${expected === "redirect" ? "notes" : "doesn't note"} that it left for Google's page`, (pending === "1") === (expected === "redirect"), String(pending));
       check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
     } finally {
       await ctx.close();
     }
+  }
+  check.done();
+});
+
+test("Google sign-in that comes back without a result says so, instead of a silent sign-in form", async () => {
+  const check = checks();
+  // Back from Google's page (the note is set), but there's no result and no user.
+  const { ctx, page, errors } = await openApp(browser, base, {
+    seed: formSeed, init: "window.__SIGNED_OUT = true;" + IOS_APP, local: { "accountBook.googleRedirect": "1" }, waitSignedIn: false,
+  });
+  try {
+    await page.waitForFunction(() => !document.getElementById("authCard").hidden);
+    const r = await page.evaluate(() => ({
+      error: document.getElementById("authError").hidden ? "" : document.getElementById("authError").textContent,
+      pending: localStorage.getItem("accountBook.googleRedirect"),
+    }));
+    check("the sign-in screen says Google sign-in didn't finish", /didn't finish/.test(r.error), r.error);
+    check("the note is cleared, so it's said once", r.pending === null, String(r.pending));
+    check("no page errors", errors.length === 0, errors.join(" | "));
+  } finally {
+    await ctx.close();
+  }
+  // A normal launch (no note) shows no such message.
+  const plain = await openApp(browser, base, { seed: formSeed, init: "window.__SIGNED_OUT = true;" + IOS_APP, waitSignedIn: false });
+  try {
+    await plain.page.waitForFunction(() => !document.getElementById("authCard").hidden);
+    const shown = await plain.page.evaluate(() => !document.getElementById("authError").hidden);
+    check("a normal launch shows no sign-in error", !shown);
+  } finally {
+    await plain.ctx.close();
   }
   check.done();
 });

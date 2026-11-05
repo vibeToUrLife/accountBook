@@ -32,6 +32,11 @@ import {
   writeBatch,
   runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import { isIosHomeScreenApp, authDomainFor } from "./js/auth-domain.js?v=1";
+
+// Set just before leaving for Google's page (redirect), checked when the app loads
+// again, so a sign-in that comes back without a result is reported, not silent.
+const REDIRECT_PENDING_KEY = "accountBook.googleRedirect";
 
 let firebaseConfig = null;
 let app = null;
@@ -40,10 +45,12 @@ let db = null;
 let authPersistenceMode = "unknown";
 
 export async function initFirebase() {
+  let sameSiteAuthHosts = [];
   try {
     // Optional file the user will create.
-    const mod = await import("./firebase-config.js");
+    const mod = await import("./firebase-config.js?v=2");
     firebaseConfig = mod.firebaseConfig;
+    sameSiteAuthHosts = mod.sameSiteAuthHosts || [];
   } catch {
     return {
       ok: false,
@@ -52,7 +59,13 @@ export async function initFirebase() {
     };
   }
 
-  app = initializeApp(firebaseConfig);
+  const authDomain = authDomainFor({
+    host: location.host,
+    iosHomeScreenApp: isIosHomeScreenApp(),
+    defaultAuthDomain: firebaseConfig.authDomain,
+    sameSiteHosts: sameSiteAuthHosts,
+  });
+  app = initializeApp({ ...firebaseConfig, authDomain });
   auth = getAuth(app);
 
   // Persistent local cache: records load from the device when offline and
@@ -83,8 +96,24 @@ export async function initFirebase() {
   }
 
   // If a Google sign-in redirect just happened, process it so errors don't get swallowed.
+  let redirectPending = false;
   try {
-    await getRedirectResult(auth);
+    redirectPending = localStorage.getItem(REDIRECT_PENDING_KEY) === "1";
+    localStorage.removeItem(REDIRECT_PENDING_KEY);
+  } catch {
+    // storage blocked: nothing to check
+  }
+  try {
+    const result = await getRedirectResult(auth);
+    // Back from Google's page with no result: say so rather than quietly showing
+    // the sign-in form again.
+    if (redirectPending && !result && !auth.currentUser) {
+      return {
+        ok: true,
+        redirectError: { code: "auth/redirect-incomplete", message: "" },
+        persistenceMode: authPersistenceMode,
+      };
+    }
   } catch (e) {
     return {
       ok: true,
@@ -116,10 +145,13 @@ export async function signInWithEmailPassword(email, password) {
   return auth.currentUser;
 }
 
-/** Opened from the iPhone/iPad home screen (added from Safari or Chrome). */
-function isIosHomeScreenApp() {
-  return navigator.standalone === true
-    || (matchMedia("(display-mode: standalone)").matches && /iPhone|iPad|iPod/.test(navigator.userAgent));
+async function redirectToGoogle(provider) {
+  try {
+    localStorage.setItem(REDIRECT_PENDING_KEY, "1");
+  } catch {
+    // storage blocked: the sign-in still works, it just can't report a failed return
+  }
+  await signInWithRedirect(auth, provider);
 }
 
 export async function signInWithGoogle() {
@@ -128,11 +160,11 @@ export async function signInWithGoogle() {
 
   // A home-screen app on iPhone can't get a popup's result back: the popup opens in
   // a separate browser sheet that can't talk to the app, so the sign-in there ends
-  // in Google's "Something went wrong" (often after approving the sign-in in Gmail),
-  // and then the redirect fallback asks for the password again. Go straight to the
-  // redirect: Google's page opens in the app itself and comes back to it.
+  // in Google's "Something went wrong" (often after approving the sign-in in Gmail).
+  // Redirect instead: Google's page opens in the app itself and comes back to it. The
+  // result only survives with the helper on the site itself (see js/auth-domain.js).
   if (isIosHomeScreenApp()) {
-    await signInWithRedirect(auth, provider);
+    await redirectToGoogle(provider);
     return null;
   }
 
@@ -148,7 +180,7 @@ export async function signInWithGoogle() {
       code === "auth/popup-closed-by-user" ||
       code === "auth/operation-not-supported-in-this-environment"
     ) {
-      await signInWithRedirect(auth, provider);
+      await redirectToGoogle(provider);
       return null;
     }
     throw e;

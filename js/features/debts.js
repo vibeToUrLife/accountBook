@@ -2,7 +2,7 @@
 // Self-contained: receives a shared `ctx` (live state getters + helpers + firestore)
 // from the core (app.js). Reads current state via ctx.* getters; writes go through
 // Firestore, and the core's onSnapshot listeners refresh state + re-render.
-import { t } from "../i18n.js?v=2"; // query must match app.js so both share one module instance
+import { t } from "../i18n.js?v=3"; // query must match app.js so both share one module instance
 export function createDebts(ctx) {
   const { money, icon, escapeHtml, todayISO, normalizeText, parsePositiveAmount, userCollections, firestore } = ctx;
   const { addDoc, setDoc, deleteDoc, doc, serverTimestamp } = firestore;
