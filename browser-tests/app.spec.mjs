@@ -502,6 +502,9 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
     ["signed in, Chinese", { seed, lang: "zh" }, "记账本"],
     ["signed out", { seed, init: WATCH_SPLASH + "window.__SIGNED_OUT = true;" }, "Account Book"],
     ["iPhone home-screen app", { seed, init: WATCH_SPLASH + IOS_APP }, "Account Book"],
+    // The rest of the page arrives 600 ms after the logo is drawn: the minimum time still
+    // counts from the logo, not from when the rest arrived.
+    ["page arriving in pieces", { seed, path: "?arrive=slow" }, "Account Book"],
     // Past the 4 s mark with nothing drawn: it must wait rather than uncover just the header.
     ["Firebase Auth answers after 6 s", { seed, init: WATCH_SPLASH + "window.__AUTH_DELAY = 6000;" }, "Account Book"],
   ];
