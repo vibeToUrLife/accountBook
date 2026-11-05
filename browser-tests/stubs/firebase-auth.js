@@ -6,8 +6,10 @@ export function onAuthStateChanged(auth, cb) { setTimeout(() => cb(user()), 0); 
 export async function createUserWithEmailAndPassword() {}
 export async function signInWithEmailAndPassword() {}
 export class GoogleAuthProvider {}
-export async function signInWithPopup() {}
-export async function signInWithRedirect() {}
+// Which Google sign-in the app used, in order: window.__authCalls ("popup" / "redirect").
+const called = (how) => (globalThis.__authCalls ||= []).push(how);
+export async function signInWithPopup() { called("popup"); }
+export async function signInWithRedirect() { called("redirect"); }
 export async function getRedirectResult() { return null; }
 export async function setPersistence() {}
 export const browserLocalPersistence = {};

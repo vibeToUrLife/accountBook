@@ -116,13 +116,28 @@ export async function signInWithEmailPassword(email, password) {
   return auth.currentUser;
 }
 
-export async function signInWithGooglePopup() {
+/** Opened from the iPhone/iPad home screen (added from Safari or Chrome). */
+function isIosHomeScreenApp() {
+  return navigator.standalone === true
+    || (matchMedia("(display-mode: standalone)").matches && /iPhone|iPad|iPod/.test(navigator.userAgent));
+}
+
+export async function signInWithGoogle() {
   if (!auth) throw new Error("Firebase not initialized");
   const provider = new GoogleAuthProvider();
 
-  // Popup is generally the most reliable across mobile browsers because it
-  // doesn't rely on sessionStorage surviving a full-page redirect.
-  // If the environment blocks popups, fall back to redirect.
+  // A home-screen app on iPhone can't get a popup's result back: the popup opens in
+  // a separate browser sheet that can't talk to the app, so the sign-in there ends
+  // in Google's "Something went wrong" (often after approving the sign-in in Gmail),
+  // and then the redirect fallback asks for the password again. Go straight to the
+  // redirect: Google's page opens in the app itself and comes back to it.
+  if (isIosHomeScreenApp()) {
+    await signInWithRedirect(auth, provider);
+    return null;
+  }
+
+  // In a browser the popup keeps the page as it is. If the environment blocks
+  // popups, fall back to redirect.
   try {
     await signInWithPopup(auth, provider);
     return auth.currentUser;
