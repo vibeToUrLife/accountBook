@@ -6,6 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   GoogleAuthProvider,
+  signInWithCredential,
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
@@ -32,25 +33,32 @@ import {
   writeBatch,
   runTransaction,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
-import { isIosHomeScreenApp, authDomainFor } from "./js/auth-domain.js?v=1";
+import { isIosHomeScreenApp, useDirectGoogleSignIn, googleAuthUrl, parseGoogleReturn, jwtPayload, randomId } from "./js/google-signin.js?v=1";
 
-// Set just before leaving for Google's page (redirect), checked when the app loads
-// again, so a sign-in that comes back without a result is reported, not silent.
+// Set just before a Firebase redirect to Google (browsers whose popups are blocked),
+// checked when the app loads again, so a sign-in that comes back without a result
+// is reported, not silent.
 const REDIRECT_PENDING_KEY = "accountBook.googleRedirect";
+// The iPhone home-screen app's own Google sign-in (js/google-signin.js): what it
+// expects back ({ state, nonce, at }), and what /__/auth/handler received.
+const GOOGLE_PENDING_KEY = "accountBook.googleSignIn";
+const GOOGLE_RETURN_KEY = "accountBook.googleReturn";
+// A sign-in started longer ago than this and never finished isn't reported.
+const GOOGLE_PENDING_MAX_MS = 15 * 60 * 1000;
 
 let firebaseConfig = null;
 let app = null;
 let auth = null;
 let db = null;
 let authPersistenceMode = "unknown";
+let googleSignIn = { clientId: "", redirectHosts: [] };
 
 export async function initFirebase() {
-  let sameSiteAuthHosts = [];
   try {
     // Optional file the user will create.
-    const mod = await import("./firebase-config.js?v=2");
+    const mod = await import("./firebase-config.js?v=3");
     firebaseConfig = mod.firebaseConfig;
-    sameSiteAuthHosts = mod.sameSiteAuthHosts || [];
+    googleSignIn = { clientId: mod.googleWebClientId || "", redirectHosts: mod.googleRedirectHosts || [] };
   } catch {
     return {
       ok: false,
@@ -59,13 +67,7 @@ export async function initFirebase() {
     };
   }
 
-  const authDomain = authDomainFor({
-    host: location.host,
-    iosHomeScreenApp: isIosHomeScreenApp(),
-    defaultAuthDomain: firebaseConfig.authDomain,
-    sameSiteHosts: sameSiteAuthHosts,
-  });
-  app = initializeApp({ ...firebaseConfig, authDomain });
+  app = initializeApp(firebaseConfig);
   // The session lives in localStorage (sessionStorage if that's blocked), not in
   // IndexedDB, Firebase's default. On iPhone, a page hidden while it loads (a
   // home-screen app reloaded in the background, the screen locking) can have its
@@ -92,7 +94,21 @@ export async function initFirebase() {
   // Which of those Auth can use; "memory" means the session won't survive a reload.
   authPersistenceMode = storageWorks("localStorage") ? "local" : storageWorks("sessionStorage") ? "session" : "memory";
 
-  // If a Google sign-in redirect just happened, process it so errors don't get swallowed.
+  // Back from the home-screen app's own Google sign-in: finish it.
+  const googleReturn = takeGoogleReturn();
+  if (googleReturn) {
+    try {
+      await finishGoogleSignIn(googleReturn);
+    } catch (e) {
+      return {
+        ok: true,
+        redirectError: { code: e?.code || "auth/redirect-incomplete", message: e?.message || "" },
+        persistenceMode: authPersistenceMode,
+      };
+    }
+  }
+
+  // If a Firebase sign-in redirect just happened, process it so errors don't get swallowed.
   let redirectPending = false;
   try {
     redirectPending = localStorage.getItem(REDIRECT_PENDING_KEY) === "1";
@@ -153,6 +169,43 @@ function storageWorks(name) {
   }
 }
 
+/** What the home-screen app's Google sign-in left behind, cleared as it's read. */
+function takeGoogleReturn() {
+  let fragment = null, pending = null;
+  try {
+    fragment = localStorage.getItem(GOOGLE_RETURN_KEY);
+    pending = JSON.parse(localStorage.getItem(GOOGLE_PENDING_KEY) || "null");
+    localStorage.removeItem(GOOGLE_RETURN_KEY);
+    localStorage.removeItem(GOOGLE_PENDING_KEY);
+  } catch {
+    return null;
+  }
+  if (fragment === null && !pending) return null;
+  // Left for Google long ago and never came back: nothing worth reporting now.
+  if (fragment === null && !(Date.now() - (pending.at || 0) < GOOGLE_PENDING_MAX_MS)) return null;
+  return { fragment, pending };
+}
+
+async function finishGoogleSignIn({ fragment, pending }) {
+  const back = parseGoogleReturn(fragment);
+  // The token must answer the request this app made (state) and carry its nonce, so
+  // a token from elsewhere, or one replayed, isn't accepted.
+  const claims = back.idToken ? jwtPayload(back.idToken) : null;
+  if (!back.idToken || !pending || back.state !== pending.state || !claims || claims.nonce !== pending.nonce) {
+    const err = new Error(back.error ? `Google sign-in: ${back.error}` : "Google sign-in didn't finish");
+    err.code = "auth/redirect-incomplete";
+    throw err;
+  }
+  await signInWithCredential(auth, GoogleAuthProvider.credential(back.idToken));
+}
+
+/** The home-screen app's Google sign-in: off to Google, back via /__/auth/handler. */
+function goToGoogle() {
+  const state = randomId(), nonce = randomId();
+  localStorage.setItem(GOOGLE_PENDING_KEY, JSON.stringify({ state, nonce, at: Date.now() }));
+  location.assign(googleAuthUrl({ clientId: googleSignIn.clientId, redirectUri: `${location.origin}/__/auth/handler`, state, nonce }));
+}
+
 async function redirectToGoogle(provider) {
   try {
     localStorage.setItem(REDIRECT_PENDING_KEY, "1");
@@ -166,13 +219,11 @@ export async function signInWithGoogle() {
   if (!auth) throw new Error("Firebase not initialized");
   const provider = new GoogleAuthProvider();
 
-  // A home-screen app on iPhone can't get a popup's result back: the popup opens in
-  // a separate browser sheet that can't talk to the app, so the sign-in there ends
-  // in Google's "Something went wrong" (often after approving the sign-in in Gmail).
-  // Redirect instead: Google's page opens in the app itself and comes back to it. The
-  // result only survives with the helper on the site itself (see js/auth-domain.js).
-  if (isIosHomeScreenApp()) {
-    await redirectToGoogle(provider);
+  // The iPhone home-screen app goes to Google itself (see js/google-signin.js):
+  // a popup can't hand its result back there, and Firebase's redirect never got its
+  // result back either.
+  if (useDirectGoogleSignIn({ iosHomeScreenApp: isIosHomeScreenApp(), host: location.host, ...googleSignIn })) {
+    goToGoogle();
     return null;
   }
 

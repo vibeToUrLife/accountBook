@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Account Book</title>
+    <!-- Google sign-in for the iPhone home-screen app comes back here (the redirect URI
+         registered on the OAuth client) with the ID token in the URL fragment, which
+         never reaches the server. Hand it to the app (same origin, js/google-signin.js)
+         and go back to it. White like the app's first frame in the home-screen app. -->
+    <style>html, body { margin: 0; height: 100%; background: #fff; }</style>
+    <script>
+      try { localStorage.setItem("accountBook.googleReturn", location.hash.slice(1)); } catch (e) {}
+      location.replace("/");
+    </script>
+  </head>
+  <body></body>
+</html>

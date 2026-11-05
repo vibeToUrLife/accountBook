@@ -12,7 +12,9 @@ export function onAuthStateChanged(auth, cb) {
 }
 export async function createUserWithEmailAndPassword() {}
 export async function signInWithEmailAndPassword() {}
-export class GoogleAuthProvider {}
+export class GoogleAuthProvider { static credential(idToken) { return { idToken }; } }
+// Signing in with a Google ID token: noted as "credential:<token>", and the user is signed in.
+export async function signInWithCredential(auth, credential) { called("credential:" + credential.idToken); globalThis.__SIGNED_OUT = false; }
 // Which Google sign-in the app used, in order: window.__authCalls ("popup" / "redirect").
 const called = (how) => (globalThis.__authCalls ||= []).push(how);
 export async function signInWithPopup() { called("popup"); }
