@@ -472,6 +472,7 @@ const WATCH_SPLASH = `(${() => {
     return {
       bg: st.backgroundColor, image: st.backgroundImage.slice(0, 15),
       colours: +getComputedStyle(el, "::before").opacity, logo: +getComputedStyle(el.querySelector(".splash-logo")).opacity,
+      ui: ["authCard", "appContent"].some((id) => { const box = document.getElementById(id); return !!box && !box.hidden; }),
     };
   };
   const firstFrame = () => {
@@ -501,8 +502,8 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
     ["signed in, Chinese", { seed, lang: "zh" }, "记账本"],
     ["signed out", { seed, init: WATCH_SPLASH + "window.__SIGNED_OUT = true;" }, "Account Book"],
     ["iPhone home-screen app", { seed, init: WATCH_SPLASH + IOS_APP }, "Account Book"],
-    // boot.js blocked too, so the page stays hidden for translation: the logo still shows.
-    ["app.js doesn't load", { seed, lang: "zh", block: ["/app.js", "/js/boot.js"] }, "记账本"],
+    // Past the 4 s mark with nothing drawn: it must wait rather than uncover just the header.
+    ["Firebase Auth answers after 6 s", { seed, init: WATCH_SPLASH + "window.__AUTH_DELAY = 6000;" }, "Account Book"],
   ];
   for (const [label, opts, name] of cases) {
     const { ctx, page, errors } = await openApp(browser, base, { init: WATCH_SPLASH, ...opts, waitSignedIn: false });
@@ -520,9 +521,8 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
       });
       check(`${label}: the logo covers the screen as the page opens`, start.covers && start.shown && start.logo > 100, JSON.stringify(start));
       check(`${label}: the name under it is "${name}"`, start.name === name, start.name);
-      if (label === "app.js doesn't load") check(`${label}: shown while the page waits for its translation`, start.pagePending && start.shown);
 
-      await page.waitForFunction(() => window.__splash.gone != null, null, { timeout: 8000 });
+      await page.waitForFunction(() => window.__splash.gone != null, null, { timeout: 12000 });
       const s = await page.evaluate(() => ({ ...window.__splash, inDom: !!document.getElementById("splash"), signIn: !document.getElementById("authCard").hidden }));
       const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v * 100) / 100 : v));
       check(`${label}: taken out of the page after its fade`, !s.inDom && s.gone - s.leaving >= 550, t);
@@ -533,18 +533,75 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
       } else {
         check(`${label}: colours and logo from the first frame`, s.first.image === "radial-gradient" && s.first.logo === 1, t);
       }
-      if (label === "app.js doesn't load") {
-        check(`${label}: goes by itself ~4 s after it appeared`, s.ready == null && s.leaving - s.shown >= 3900 && s.leaving - s.shown < 4600, t);
+      check(`${label}: on screen at least ~1.2 s, so it doesn't just flash by`, s.leaving - s.shown >= 1150, t);
+      check(`${label}: the app is drawn underneath when it goes`, s.atLeaving.ui, t);
+      if (label === "Firebase Auth answers after 6 s") {
+        check(`${label}: waits for it (no page with only the header at 4 s), then goes`, s.leaving > 6000 && s.leaving < 7000, t);
       } else {
-        check(`${label}: on screen at least ~1.2 s, so it doesn't just flash by`, s.leaving - s.shown >= 1150, t);
         check(`${label}: goes right after that once the app is ready`, s.ready != null && s.leaving - Math.max(s.ready, s.shown + 1200) < 300, t);
         if (label === "signed out") check(`${label}: the sign-in form is what's underneath`, s.signIn, t);
         else check(`${label}: the records are drawn before it goes`, s.rowsAtReady >= 1, t);
-        check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
       }
+      check(`${label}: no "didn't load" message`, !(await page.evaluate(() => document.documentElement.classList.contains("splash-failed"))));
+      check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
     } finally {
       await ctx.close();
     }
+  }
+  check.done();
+});
+
+test("launch screen: when the app can't start, it says so and offers a reload (never just the header)", async () => {
+  const check = checks();
+  for (const [label, opts, failed] of [
+    // Firebase Auth wedged (on iPhone: IndexedDB closed under its first read).
+    ["Firebase Auth never answers", { init: WATCH_SPLASH + "window.__AUTH_DELAY = Infinity;" }, /stuck at: sign-in check/],
+    // boot.js blocked too, so the page stays hidden for translation: the logo still shows.
+    ["app.js doesn't load", { lang: "zh", block: ["/app.js", "/js/boot.js"] }, /app\.js didn't start.*failed to load app\.js/],
+  ]) {
+    const { ctx, page } = await openApp(browser, base, { seed: formSeed, init: WATCH_SPLASH, ...opts, waitSignedIn: false });
+    try {
+      await page.waitForTimeout(5000);
+      const mid = await page.evaluate(() => ({
+        logo: !!document.getElementById("splash") && !document.documentElement.classList.contains("splash-leaving"),
+        problem: document.documentElement.classList.contains("splash-failed"),
+      }));
+      check(`${label}: still the logo (loading) at 5 s, not an empty page`, mid.logo && !mid.problem, JSON.stringify(mid));
+
+      await page.waitForFunction(() => document.documentElement.classList.contains("splash-failed"), null, { timeout: 9000 });
+      const r = await page.evaluate(() => {
+        const visible = (el) => !!el && el.offsetParent !== null, splash = document.getElementById("splash");
+        const shownText = (sel) => [...document.querySelectorAll(sel)].filter(visible).map((el) => el.textContent).join();
+        return {
+          after: Math.round(performance.now() - window.__splash.shown),
+          message: shownText("#splash .splash-problem p:first-child span"), button: shownText("#splash .splash-reload span"),
+          error: document.getElementById("splashError").textContent,
+          covers: splash.contains(document.elementFromPoint(innerWidth / 2, innerHeight / 2)), ariaHidden: splash.getAttribute("aria-hidden"),
+        };
+      });
+      check(`${label}: after ~10 s it says the app didn't load, with a Reload button`, r.after >= 9900 && r.message.length > 10 && /^(Reload|重新加载)$/.test(r.button), JSON.stringify(r));
+      check(`${label}: still covering the page, and now read out by screen readers`, r.covers && r.ariaHidden === null, JSON.stringify(r));
+      check(`${label}: it says where start-up stopped`, failed.test(r.error), r.error);
+
+      await page.evaluate(() => { window.__beforeReload = true; });
+      await Promise.all([page.waitForEvent("load"), page.click(".splash-reload")]);
+      check(`${label}: Reload reloads the page`, await page.evaluate(() => window.__beforeReload !== true));
+    } finally {
+      await ctx.close();
+    }
+  }
+  check.done();
+});
+
+test("Firebase Auth keeps the session in localStorage, not IndexedDB (which iOS can close mid-start)", async () => {
+  const check = checks();
+  const { ctx, page } = await openApp(browser, base, { seed: formSeed });
+  try {
+    const init = await page.evaluate(() => ({ persistence: window.__authInit.persistence.map((p) => p.type), resolver: !!window.__authInit.popupRedirectResolver }));
+    check("localStorage first, sessionStorage as fallback, no IndexedDB", init.persistence.join() === "LOCAL,SESSION", init.persistence.join());
+    check("popup/redirect sign-in still set up", init.resolver);
+  } finally {
+    await ctx.close();
   }
   check.done();
 });

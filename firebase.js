@@ -1,6 +1,7 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
 import {
-  getAuth,
+  initializeAuth,
+  browserPopupRedirectResolver,
   onAuthStateChanged,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,7 +9,6 @@ import {
   signInWithPopup,
   signInWithRedirect,
   getRedirectResult,
-  setPersistence,
   browserLocalPersistence,
   browserSessionPersistence,
   signOut,
@@ -66,7 +66,16 @@ export async function initFirebase() {
     sameSiteHosts: sameSiteAuthHosts,
   });
   app = initializeApp({ ...firebaseConfig, authDomain });
-  auth = getAuth(app);
+  // The session lives in localStorage (sessionStorage if that's blocked), not in
+  // IndexedDB, Firebase's default. On iPhone, a page hidden while it loads (a
+  // home-screen app reloaded in the background, the screen locking) can have its
+  // IndexedDB closed under Firebase's first read; Auth then never reports signed in
+  // or out (firebase-js-sdk #10311) and the app stayed at just its header. Earlier
+  // versions moved the session to localStorage on every launch, so it is found there.
+  auth = initializeAuth(app, {
+    persistence: [browserLocalPersistence, browserSessionPersistence],
+    popupRedirectResolver: browserPopupRedirectResolver,
+  });
 
   // Persistent local cache: records load from the device when offline and
   // writes made offline are queued and synced once the connection returns.
@@ -80,20 +89,8 @@ export async function initFirebase() {
     db = getFirestore(app);
   }
 
-  // Improve cross-browser session behavior (especially mobile / private modes).
-  // If local persistence is blocked, fall back to session persistence.
-  try {
-    await setPersistence(auth, browserLocalPersistence);
-    authPersistenceMode = "local";
-  } catch {
-    try {
-      await setPersistence(auth, browserSessionPersistence);
-      authPersistenceMode = "session";
-    } catch {
-      // ignore; Firebase will fall back to in-memory persistence
-      authPersistenceMode = "memory";
-    }
-  }
+  // Which of those Auth can use; "memory" means the session won't survive a reload.
+  authPersistenceMode = storageWorks("localStorage") ? "local" : storageWorks("sessionStorage") ? "session" : "memory";
 
   // If a Google sign-in redirect just happened, process it so errors don't get swallowed.
   let redirectPending = false;
@@ -143,6 +140,17 @@ export async function signInWithEmailPassword(email, password) {
   if (!auth) throw new Error("Firebase not initialized");
   await signInWithEmailAndPassword(auth, email, password);
   return auth.currentUser;
+}
+
+function storageWorks(name) {
+  try {
+    const store = window[name];
+    store.setItem("accountBook.storageTest", "1");
+    store.removeItem("accountBook.storageTest");
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function redirectToGoogle(provider) {

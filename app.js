@@ -7,7 +7,7 @@ import {
   signInWithGoogle,
   userCollections,
   firestoreApi,
-} from "./firebase.js?v=4";
+} from "./firebase.js?v=5";
 
 import {
   todayISO,
@@ -5479,7 +5479,11 @@ function fillDefaultDates() {
   return changed;
 }
 
+// Where start-up has got to; the launch screen shows it if the app never comes up.
+const startupStage = (stage) => { window.__startupStage = stage; };
+
 async function main() {
+  startupStage("starting");
   initLang();
   translateDom();
   updateLangToggle();
@@ -5509,6 +5513,7 @@ async function main() {
   });
   window.addEventListener("online", () => recurring.autoRun({ force: true }));
 
+  startupStage("Firebase");
   const init = await initFirebase();
   if (!init.ok) {
     setWarning(init.reason);
@@ -5531,6 +5536,7 @@ async function main() {
 
   setWarning("");
   setAuthStatus(t("Checking session…"));
+  startupStage("sign-in check");
 
   watchAuth(async (user) => {
     if (!user) {
