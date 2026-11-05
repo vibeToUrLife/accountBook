@@ -493,6 +493,13 @@ const WATCH_SPLASH = `(${() => {
 }})();`;
 // Opened from the iPhone home screen.
 const IOS_APP = `Object.defineProperty(Navigator.prototype, "standalone", { get: () => true, configurable: true });`;
+// The live site's host stands in for this test server's in firebase-config.js, so the
+// home-screen app signs in by going to Google directly here too.
+const directGoogleHere = (base) => [["**/firebase-config.js*", async (route) => {
+  const response = await route.fetch();
+  const host = new URL(base).host;
+  route.fulfill({ response, body: (await response.text()).replace('["accbook.vercel.app"]', `["accbook.vercel.app", "${host}"]`) });
+}]];
 
 test("launch screen: the logo first, gone once the records are drawn, never stuck", async () => {
   const check = checks();
@@ -502,6 +509,10 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
     ["signed in, Chinese", { seed, lang: "zh" }, "记账本"],
     ["signed out", { seed, init: WATCH_SPLASH + "window.__SIGNED_OUT = true;" }, "Account Book"],
     ["iPhone home-screen app", { seed, init: WATCH_SPLASH + IOS_APP }, "Account Book"],
+    // As on the live site, where Firebase's popup/redirect helper never answers in the
+    // home-screen app: Auth used to wait 5 s for it on every launch.
+    ["iPhone home-screen app, Firebase's sign-in helper never answering",
+      { seed, init: WATCH_SPLASH + IOS_APP + "window.__AUTH_HELPER_NEVER_ANSWERS = true;", routes: directGoogleHere(base) }, "Account Book"],
     // The rest of the page arrives 600 ms after the logo is drawn: the minimum time still
     // counts from the logo, not from when the rest arrived.
     ["page arriving in pieces", { seed, path: "?arrive=slow" }, "Account Book"],
@@ -529,7 +540,7 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
       const s = await page.evaluate(() => ({ ...window.__splash, inDom: !!document.getElementById("splash"), signIn: !document.getElementById("authCard").hidden }));
       const t = JSON.stringify(s, (k, v) => (typeof v === "number" ? Math.round(v * 100) / 100 : v));
       check(`${label}: taken out of the page after its fade`, !s.inDom && s.gone - s.leaving >= 300, t);
-      if (label === "iPhone home-screen app") {
+      if (label.startsWith("iPhone home-screen app")) {
         // Same plain white as the iOS launch image and the frame iOS shows before the page draws.
         check(`${label}: the first frame is plain white`, s.first.bg === "rgb(255, 255, 255)" && s.first.image === "none" && s.first.colours < 0.1 && s.first.logo < 0.1, t);
         check(`${label}: then the colours and the logo fade in`, s.atLeaving.colours === 1 && s.atLeaving.logo === 1, t);
@@ -545,6 +556,7 @@ test("launch screen: the logo first, gone once the records are drawn, never stuc
         if (label === "signed out") check(`${label}: the sign-in form is what's underneath`, s.signIn, t);
         else check(`${label}: the records are drawn before it goes`, s.rowsAtReady >= 1, t);
       }
+      if (label.endsWith("never answering")) check(`${label}: doesn't wait for it`, s.leaving - s.shown < 2000, t);
       check(`${label}: no "didn't load" message`, !(await page.evaluate(() => document.documentElement.classList.contains("splash-failed"))));
       check(`${label}: no page errors`, errors.length === 0, errors.join(" | "));
     } finally {
@@ -596,26 +608,32 @@ test("launch screen: when the app can't start, it says so and offers a reload (n
   check.done();
 });
 
-test("Firebase Auth keeps the session in localStorage, not IndexedDB (which iOS can close mid-start)", async () => {
+test("Firebase Auth: the session in localStorage, not IndexedDB (which iOS can close mid-start); its popup/redirect helper only where it's used", async () => {
   const check = checks();
-  const { ctx, page } = await openApp(browser, base, { seed: formSeed });
-  try {
-    const init = await page.evaluate(() => ({ persistence: window.__authInit.persistence.map((p) => p.type), resolver: !!window.__authInit.popupRedirectResolver }));
-    check("localStorage first, sessionStorage as fallback, no IndexedDB", init.persistence.join() === "LOCAL,SESSION", init.persistence.join());
-    check("popup/redirect sign-in still set up", init.resolver);
-  } finally {
-    await ctx.close();
+  for (const [label, opts, helper] of [
+    // Browsers sign in with Firebase's popup (or its redirect).
+    ["a browser", {}, true],
+    // The home-screen app goes to Google itself. Firebase's helper never answers there,
+    // and Auth waited 5 s for it on every launch.
+    ["the iPhone home-screen app", { init: "window.__SIGNED_OUT = true;" + IOS_APP, routes: directGoogleHere(base) }, false],
+  ]) {
+    const { ctx, page } = await openApp(browser, base, { seed: formSeed, init: "window.__SIGNED_OUT = true;", ...opts, waitSignedIn: false });
+    try {
+      await page.waitForFunction(() => !document.getElementById("authCard").hidden);
+      const r = await page.evaluate(() => ({
+        persistence: window.__authInit.persistence.map((p) => p.type), helper: !!window.__authInit.popupRedirectResolver,
+        error: document.getElementById("authError").hidden ? "" : document.getElementById("authError").textContent,
+      }));
+      check(`${label}: localStorage first, sessionStorage as fallback, no IndexedDB`, r.persistence.join() === "LOCAL,SESSION", r.persistence.join());
+      check(`${label}: Firebase's popup/redirect helper ${helper ? "set up" : "not loaded"}`, r.helper === helper);
+      check(`${label}: no sign-in error at launch`, r.error === "", r.error);
+    } finally {
+      await ctx.close();
+    }
   }
   check.done();
 });
 
-// The live site's host stands in for this test server's in firebase-config.js, so the
-// home-screen app signs in by going to Google directly here too.
-const directGoogleHere = (base) => [["**/firebase-config.js*", async (route) => {
-  const response = await route.fetch();
-  const host = new URL(base).host;
-  route.fulfill({ response, body: (await response.text()).replace('["accbook.vercel.app"]', `["accbook.vercel.app", "${host}"]`) });
-}]];
 // A Google ID token as Google would send it (the app only reads its claims; Firebase checks it).
 const idToken = (claims) => ["{\"alg\":\"RS256\"}", JSON.stringify(claims)].map((p) => Buffer.from(p).toString("base64url")).join(".") + ".sig";
 const NOW = Date.parse("2026-10-31T10:00:00+08:00"); // openApp's fixed clock

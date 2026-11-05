@@ -52,6 +52,8 @@ let auth = null;
 let db = null;
 let authPersistenceMode = "unknown";
 let googleSignIn = { clientId: "", redirectHosts: [] };
+// The iPhone home-screen app signing in by going to Google itself (js/google-signin.js).
+let directGoogle = false;
 
 export async function initFirebase() {
   try {
@@ -68,15 +70,23 @@ export async function initFirebase() {
   }
 
   app = initializeApp(firebaseConfig);
+  directGoogle = useDirectGoogleSignIn({ iosHomeScreenApp: isIosHomeScreenApp(), host: location.host, ...googleSignIn });
   // The session lives in localStorage (sessionStorage if that's blocked), not in
   // IndexedDB, Firebase's default. On iPhone, a page hidden while it loads (a
   // home-screen app reloaded in the background, the screen locking) can have its
   // IndexedDB closed under Firebase's first read; Auth then never reports signed in
   // or out (firebase-js-sdk #10311) and the app stayed at just its header. Earlier
   // versions moved the session to localStorage on every launch, so it is found there.
+  //
+  // Firebase's popup/redirect helper (Google's gapi script and a hidden frame from
+  // authDomain) is only set up where the popup or Firebase's redirect is used. Given
+  // it here, Firebase loads it as the app starts on iPhones and in Safari, and holds
+  // back "signed in or out" until it answers, for up to 5 s. In the home-screen app
+  // it never answers, so every launch waited 5 s on the launch screen for nothing;
+  // that app signs in without it. The popup and redirect calls pass it themselves.
   auth = initializeAuth(app, {
     persistence: [browserLocalPersistence, browserSessionPersistence],
-    popupRedirectResolver: browserPopupRedirectResolver,
+    ...(directGoogle ? {} : { popupRedirectResolver: browserPopupRedirectResolver }),
   });
 
   // Persistent local cache: records load from the device when offline and
@@ -117,7 +127,8 @@ export async function initFirebase() {
     // storage blocked: nothing to check
   }
   try {
-    const result = await getRedirectResult(auth);
+    // Only loads the helper if Firebase noted a redirect of its own in this tab.
+    const result = await getRedirectResult(auth, browserPopupRedirectResolver);
     // Back from Google's page with no result: say so rather than quietly showing
     // the sign-in form again.
     if (redirectPending && !result && !auth.currentUser) {
@@ -212,7 +223,7 @@ async function redirectToGoogle(provider) {
   } catch {
     // storage blocked: the sign-in still works, it just can't report a failed return
   }
-  await signInWithRedirect(auth, provider);
+  await signInWithRedirect(auth, provider, browserPopupRedirectResolver);
 }
 
 export async function signInWithGoogle() {
@@ -222,7 +233,7 @@ export async function signInWithGoogle() {
   // The iPhone home-screen app goes to Google itself (see js/google-signin.js):
   // a popup can't hand its result back there, and Firebase's redirect never got its
   // result back either.
-  if (useDirectGoogleSignIn({ iosHomeScreenApp: isIosHomeScreenApp(), host: location.host, ...googleSignIn })) {
+  if (directGoogle) {
     goToGoogle();
     return null;
   }
@@ -230,7 +241,7 @@ export async function signInWithGoogle() {
   // In a browser the popup keeps the page as it is. If the environment blocks
   // popups, fall back to redirect.
   try {
-    await signInWithPopup(auth, provider);
+    await signInWithPopup(auth, provider, browserPopupRedirectResolver);
     return auth.currentUser;
   } catch (e) {
     const code = e?.code || "";

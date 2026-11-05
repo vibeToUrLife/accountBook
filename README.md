@@ -63,6 +63,7 @@ A popup can't hand its result back to a home-screen app on iPhone, and Firebase'
 - It goes to Google itself and asks for an ID token (OpenID Connect, `response_type=id_token`, with a `state` and a `nonce`), using Firebase's own web OAuth client (`googleWebClientId` in `firebase-config.js`).
 - Google sends the token back to `https://accbook.vercel.app/__/auth/handler` (`__/auth/handler.html`), which hands it to the app; the app checks `state` and `nonce` and signs in with `signInWithCredential`. The token stays in the URL fragment, so it never reaches the server; the service worker leaves `/__/` alone.
 - Only on the hosts in `googleRedirectHosts` (`firebase-config.js`). Browsers keep Firebase's popup.
+- There the app doesn't give Firebase its popup/redirect helper (`browserPopupRedirectResolver`) at all. Given it when Auth starts, Firebase loads it right away on iPhones and in Safari and holds back "signed in or out" until it answers, for up to 5 s; in the home-screen app it never answers, so every launch sat on the launch screen for 5 s. Browsers still get it when Auth starts (Safari would otherwise block the popup), and the popup and redirect calls pass it themselves.
 - One-time setup for each such host, in Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs → "Web client (auto created by Google Service)" (ID starting with the project number) → Authorized redirect URIs: add `https://accbook.vercel.app/__/auth/handler` and save. Without it, Google answers with "Error 400: redirect_uri_mismatch".
 
 ### Deploy note (important)
