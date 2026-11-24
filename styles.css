@@ -1248,6 +1248,13 @@ body:has(.edit-modal-overlay:not([hidden])) #undoToast { z-index: 10001; }
 .budget-records-filters { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
 .budget-records-filters .search { flex: 1; min-width: 140px; }
 .budget-records-date-filter { display: flex; gap: 6px; align-items: center; }
+/* A budget's records: tap one to edit or delete it. The table fits the dialog
+   (records never scroll sideways) and long notes wrap. */
+.budget-records-modal .table { min-width: 0; }
+.budget-records-modal .table td { overflow-wrap: anywhere; }
+.budget-records-modal .table td.row-go { width: 1%; white-space: nowrap; text-align: right; color: var(--muted); }
+.budget-records-modal .table tr.clickable-row:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+#editTxDeleteBtn { margin-left: auto; }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes modalSlideIn {
   from { opacity: 0; transform: translateY(24px) scale(0.96); }
@@ -1652,6 +1659,8 @@ body:has(.edit-modal-overlay:not([hidden])) #undoToast { z-index: 10001; }
   .budget-records-filters .search { min-width: 0; width: 100%; }
   .budget-records-date-filter { width: 100%; }
   .budget-records-date-filter input[type="date"] { flex: 1; }
+  .budget-records-modal .table tbody tr.clickable-row { position: relative; padding-right: 44px; }
+  .budget-records-modal .table td.row-go { position: absolute; top: 50%; right: 14px; transform: translateY(-50%); width: auto; padding: 0; }
 
   .dashboard-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .dash-card { padding: 14px 10px; }

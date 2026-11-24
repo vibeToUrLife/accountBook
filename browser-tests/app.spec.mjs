@@ -163,7 +163,7 @@ test("budgets: per-month amounts, rounding, refunds", async () => {
   check.done();
 });
 
-test("budget records: edit or delete a record right from a budget's list", async () => {
+test("budget records: tap a record to edit or delete it, right from a budget's list", async () => {
   const check = checks();
   const { ctx, page, errors } = await openApp(browser, base, { seed: [
     [U + "settings/preferences", { currencySymbol: "RM" }],
@@ -178,8 +178,12 @@ test("budget records: edit or delete a record right from a budget's list", async
     rows: [...document.querySelectorAll("#budgetRecordsTbody tr")].map((tr) => tr.innerText.replace(/\s+/g, " ").trim()),
     summary: document.getElementById("budgetRecordsSummary").innerText.replace(/\s+/g, " "),
   }));
-  const press = (note, action) => page.locator("#budgetRecordsTbody tr", { hasText: note }).locator(`button[data-action='${action}']`).click({ timeout: 5000 });
-  const edit = (note) => press(note, "edit-tx");
+  const stored = async () => Object.keys(await docs(page, U + "transactions/"));
+  // Tap a record (anywhere on it) to open its edit form.
+  const tap = async (note) => {
+    await page.locator("#budgetRecordsTbody tr", { hasText: note }).locator("td").first().click({ timeout: 5000 });
+    await settle(page, 400); // on a phone the form slides up from below the screen first
+  };
   // Whether a tap in the middle of this element reaches it (nothing on top of it).
   const onTop = (sel) => page.evaluate((sel) => {
     const el = document.querySelector(sel), r = el.getBoundingClientRect();
@@ -190,22 +194,23 @@ test("budget records: edit or delete a record right from a budget's list", async
     await view(page, "budget"); await settle(page, 300);
     await page.click('tr[data-category-id="food"] td:first-child');
     let s = await list();
-    const buttons = await page.evaluate(() => [...document.querySelectorAll("#budgetRecordsTbody tr")].map((tr) => [...tr.querySelectorAll("button")].map((b) => b.dataset.action).join()));
-    check("each record in the budget's list has Edit and Delete", s.open && s.rows.length === 2 && buttons.every((b) => b === "edit-tx,delete-tx"), JSON.stringify(buttons));
+    const rows = await page.evaluate(() => [...document.querySelectorAll("#budgetRecordsTbody tr")].map((tr) => ({ id: tr.dataset.id, buttons: tr.querySelectorAll("button").length, focusable: tr.tabIndex === 0 })));
+    check("the budget's records have no buttons of their own; each one opens when tapped", s.open && rows.length === 2 && rows.every((r) => r.id && r.buttons === 0 && r.focusable), JSON.stringify(rows));
 
-    await edit("lunch");
-    await settle(page, 400); // on a phone the form slides up from below the screen first
+    await tap("lunch");
     const form = await page.evaluate(() => {
       const box = document.querySelector("#editTxModal .edit-modal").getBoundingClientRect();
       const top = document.elementFromPoint(box.left + box.width / 2, box.top + 20);
+      const shown = (id) => { const b = document.getElementById(id); return !!b && b.offsetParent !== null; };
       return {
-        onTop: !!top && document.getElementById("editTxModal").contains(top),
+        onTop: !!top && document.getElementById("editTxModal").contains(top), save: shown("editTxSaveBtn"), del: shown("editTxDeleteBtn"),
         category: document.getElementById("editTxCategory").value, amount: document.getElementById("editTxAmount").value,
         note: document.getElementById("editTxNote").value, date: document.getElementById("editTxDate").value,
       };
     });
-    check("Edit opens the record's form over the budget's list", form.onTop && (await list()).open, JSON.stringify(form));
+    check("tapping a record opens its form over the budget's list", form.onTop && (await list()).open, JSON.stringify(form));
     check("the form holds that record", form.category === "food" && form.amount === "12.00" && form.note === "lunch" && form.date === "2026-10-30", JSON.stringify(form));
+    check("the form has Save and Delete", form.save && form.del, JSON.stringify(form));
 
     await page.fill("#editTxAmount", "1550");
     await page.fill("#editTxNote", "lunch with Ali");
@@ -217,20 +222,30 @@ test("budget records: edit or delete a record right from a budget's list", async
     check("the form closes and the budget's list stays open, showing the change", !s.editing && s.open && s.rows.some((r) => r.includes("RM15.50") && r.includes("lunch with Ali")), JSON.stringify(s.rows));
     check("the budget's totals follow (RM15.50 + RM30.00 spent)", s.summary.includes("RM45.50"), s.summary);
 
-    await edit("dinner");
+    // Keyboard: Enter on a focused record opens it too; Escape closes just the form.
+    await page.focus('#budgetRecordsTbody tr[data-id="t2"]');
+    await page.keyboard.press("Enter");
+    await settle(page, 400);
+    check("Enter on a record opens its form", (await list()).editing);
     await page.keyboard.press("Escape");
     s = await list();
     check("Escape closes just the form, back to the budget's list", !s.editing && s.open, JSON.stringify(s));
 
-    // Delete, as in the record list: asks first, then offers Undo, both above the budget's list.
-    await press("dinner", "delete-tx");
+    // Delete in the form: asks first (above the form), Cancel keeps everything.
+    await tap("dinner");
+    await page.click("#editTxDeleteBtn");
     await settle(page, 300);
-    check("Delete asks first, above the budget's list", await onTop("#confirmYesBtn") && "t2" in (await docs(page, U + "transactions/")));
+    check("Delete asks first, above the form", await onTop("#confirmYesBtn") && (await stored()).includes("t2"));
+    await page.click("#confirmNoBtn", { timeout: 5000 });
+    await settle(page, 300);
+    check("Cancel: nothing deleted and the form stays open", (await list()).editing && (await stored()).includes("t2"));
+    await page.click("#editTxDeleteBtn");
+    await settle(page, 300);
     await page.click("#confirmYesBtn", { timeout: 5000 });
     await settle(page, 300);
     s = await list();
-    check("confirmed: the record is deleted", !("t2" in (await docs(page, U + "transactions/"))));
-    check("it leaves the budget's list, which stays open, and the totals follow", s.open && s.rows.length === 1 && !s.rows.some((r) => r.includes("dinner")) && s.summary.includes("RM15.50"), JSON.stringify(s));
+    check("confirmed: the record is deleted", !(await stored()).includes("t2"));
+    check("the form closes; the record leaves the budget's list, which stays open, and the totals follow", !s.editing && s.open && s.rows.length === 1 && !s.rows.some((r) => r.includes("dinner")) && s.summary.includes("RM15.50"), JSON.stringify(s));
     check("Undo is offered above the budget's list", await onTop("#undoBtn"));
     await page.click("#undoBtn", { timeout: 5000 });
     await settle(page, 300);
@@ -239,7 +254,7 @@ test("budget records: edit or delete a record right from a budget's list", async
 
     // Offline the save only settles once the server has it: the form must not wait for that.
     await page.evaluate(() => { window.__OFFLINE = true; });
-    await edit("dinner");
+    await tap("dinner");
     await page.selectOption("#editTxCategory", "shop");
     await page.click("#editTxSaveBtn");
     await settle(page, 300);
@@ -251,6 +266,35 @@ test("budget records: edit or delete a record right from a budget's list", async
     check("no page errors", errors.length === 0, errors.join(" | "));
   } finally {
     await ctx.close();
+  }
+  check.done();
+});
+
+test("budget records: never scroll sideways, on a phone or a computer", async () => {
+  const check = checks();
+  const longNote = "Dinner-with-the-whole-team-after-the-quarterly-review-meeting-downtown-by-the-river";
+  for (const width of [320, 393, 1280]) {
+    const { ctx, page, errors } = await openApp(browser, base, { width, seed: [
+      [U + "settings/preferences", { currencySymbol: "RM" }],
+      cat("food", "Food", { budget: 600 }),
+      tx("t1", "food", 12345.67, "expense", "2026-10-30", { note: "lunch" }),
+      tx("t2", "food", 30, "revenue", "2026-10-21", { note: longNote }),
+    ] });
+    try {
+      await view(page, "budget"); await settle(page, 300);
+      await page.click('tr[data-category-id="food"] td:first-child');
+      await settle(page, 400);
+      const r = await page.evaluate(() => {
+        const wrap = document.querySelector(".budget-records-table-wrap"), dialog = document.querySelector(".budget-records-modal");
+        return { list: [wrap.scrollWidth, wrap.clientWidth], dialog: [dialog.scrollWidth, dialog.clientWidth], page: [document.documentElement.scrollWidth, innerWidth] };
+      });
+      const fits = ([content, box]) => content <= box;
+      check(`${width}px: the records don't scroll sideways`, fits(r.list), JSON.stringify(r));
+      check(`${width}px: nor do the dialog and the page`, fits(r.dialog) && fits(r.page), JSON.stringify(r));
+      check(`${width}px: no page errors`, errors.length === 0, errors.join(" | "));
+    } finally {
+      await ctx.close();
+    }
   }
   check.done();
 });

@@ -10,7 +10,7 @@ A personal finance tracker built with plain **HTML/CSS/JavaScript** and **Fireba
 - Add **expense** or **revenue** records (amount + note + date)
 - Categories with a budget per category, on a **Monthly**, **Yearly**, or **Lifetime** period
 - Category balance auto-updates within the budget period: `balance = budget + revenue - expense`
-- Tap a budget to see its records for the period (search, filter by date), and **edit** or **delete** any of them right there (delete asks first and offers Undo); the list and the budget's totals update straight away
+- Tap a budget to see its records for the period (search, filter by date); tap a record to **edit** or **delete** it right there (delete asks first and offers Undo). The list and the budget's totals update straight away, and the list never scrolls sideways
 - **Tags** on records, plus auto-category suggestions and duplicate-record warnings
 - **Quick templates** — save common records as one-tap chips
 - **Recurring transactions** — auto-add monthly bills/income; months missed while the app was closed are added when it next opens, and a rule on the 31st uses the last day of shorter months
