@@ -163,7 +163,7 @@ test("budgets: per-month amounts, rounding, refunds", async () => {
   check.done();
 });
 
-test("budget records: edit a record right from a budget's list", async () => {
+test("budget records: edit or delete a record right from a budget's list", async () => {
   const check = checks();
   const { ctx, page, errors } = await openApp(browser, base, { seed: [
     [U + "settings/preferences", { currencySymbol: "RM" }],
@@ -178,13 +178,20 @@ test("budget records: edit a record right from a budget's list", async () => {
     rows: [...document.querySelectorAll("#budgetRecordsTbody tr")].map((tr) => tr.innerText.replace(/\s+/g, " ").trim()),
     summary: document.getElementById("budgetRecordsSummary").innerText.replace(/\s+/g, " "),
   }));
-  const edit = (note) => page.locator("#budgetRecordsTbody tr", { hasText: note }).locator("button[data-action='edit-tx']").click({ timeout: 5000 });
+  const press = (note, action) => page.locator("#budgetRecordsTbody tr", { hasText: note }).locator(`button[data-action='${action}']`).click({ timeout: 5000 });
+  const edit = (note) => press(note, "edit-tx");
+  // Whether a tap in the middle of this element reaches it (nothing on top of it).
+  const onTop = (sel) => page.evaluate((sel) => {
+    const el = document.querySelector(sel), r = el.getBoundingClientRect();
+    const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return !el.closest("[hidden]") && !!hit && el.contains(hit);
+  }, sel);
   try {
     await view(page, "budget"); await settle(page, 300);
     await page.click('tr[data-category-id="food"] td:first-child');
     let s = await list();
-    const buttons = await page.locator("#budgetRecordsTbody button[data-action='edit-tx']").count();
-    check("each record in the budget's list has an Edit button", s.open && s.rows.length === 2 && buttons === 2, JSON.stringify(s.rows));
+    const buttons = await page.evaluate(() => [...document.querySelectorAll("#budgetRecordsTbody tr")].map((tr) => [...tr.querySelectorAll("button")].map((b) => b.dataset.action).join()));
+    check("each record in the budget's list has Edit and Delete", s.open && s.rows.length === 2 && buttons.every((b) => b === "edit-tx,delete-tx"), JSON.stringify(buttons));
 
     await edit("lunch");
     await settle(page, 400); // on a phone the form slides up from below the screen first
@@ -214,6 +221,21 @@ test("budget records: edit a record right from a budget's list", async () => {
     await page.keyboard.press("Escape");
     s = await list();
     check("Escape closes just the form, back to the budget's list", !s.editing && s.open, JSON.stringify(s));
+
+    // Delete, as in the record list: asks first, then offers Undo, both above the budget's list.
+    await press("dinner", "delete-tx");
+    await settle(page, 300);
+    check("Delete asks first, above the budget's list", await onTop("#confirmYesBtn") && "t2" in (await docs(page, U + "transactions/")));
+    await page.click("#confirmYesBtn", { timeout: 5000 });
+    await settle(page, 300);
+    s = await list();
+    check("confirmed: the record is deleted", !("t2" in (await docs(page, U + "transactions/"))));
+    check("it leaves the budget's list, which stays open, and the totals follow", s.open && s.rows.length === 1 && !s.rows.some((r) => r.includes("dinner")) && s.summary.includes("RM15.50"), JSON.stringify(s));
+    check("Undo is offered above the budget's list", await onTop("#undoBtn"));
+    await page.click("#undoBtn", { timeout: 5000 });
+    await settle(page, 300);
+    s = await list();
+    check("Undo brings it back into the list and the totals", s.rows.length === 2 && s.rows.some((r) => r.includes("dinner")) && s.summary.includes("RM45.50"), JSON.stringify(s));
 
     // Offline the save only settles once the server has it: the form must not wait for that.
     await page.evaluate(() => { window.__OFFLINE = true; });

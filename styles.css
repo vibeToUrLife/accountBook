@@ -740,6 +740,10 @@ input:focus, select:focus, textarea:focus {
 }
 #undoToast:not([hidden]),
 #confirmToast:not([hidden]) { animation: toast-in 0.25s ease-out; }
+/* Over an open dialog (deleting from a budget's records), the confirm and Undo
+   toasts sit above it, not behind its dimmed backdrop. */
+body:has(.edit-modal-overlay:not([hidden])) #confirmToast,
+body:has(.edit-modal-overlay:not([hidden])) #undoToast { z-index: 10001; }
 
 /* ============================================================
    GENERIC STAT TILE
