@@ -2076,6 +2076,7 @@ function renderBudgetRecordsModal(category) {
       <td>
         <div class="row-actions">
           <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${escapeHtml(tx.id)}">${escapeHtml(t("Edit"))}</button>
+          <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${escapeHtml(tx.id)}">${escapeHtml(t("Delete"))}</button>
         </div>
       </td>
     `;
@@ -2220,6 +2221,48 @@ function deleteTransactionById(txId) {
   writeReceiptPurges(queue);
   // Not awaited: offline, a write only settles once the server has it.
   deleteDoc(doc(txCol, txId)).catch((err) => setAppError(friendlyDbError(err)));
+}
+
+// Delete a record once the user confirms, with Undo for a few seconds; its photos go
+// when Undo expires. Used by the record list and by a budget's records.
+async function deleteRecordWithUndo(id, btn) {
+  setAppError("");
+  const ok = await showConfirmToast(t("Delete this record?"));
+  if (!ok) return;
+
+  await withDisabled(btn, async () => {
+    try {
+      const { transactions: txCol } = userCollections(uid);
+      const docRef = doc(txCol, id);
+
+      let backup = transactions.find((t) => t.id === id) || null;
+      if (!backup) {
+        const snap = await getDoc(docRef);
+        backup = snap.exists() ? { id: snap.id, ...snap.data() } : null;
+      }
+
+      deleteTransactionById(id);
+
+      const ownerUid = uid;
+      if (backup) {
+        const dataToRestore = stripUndefined({ ...backup });
+        delete dataToRestore.id;
+        showUndoToast({
+          message: t("Record deleted. Undo?"),
+          onUndo: async () => {
+            // Same id, so the photos (not deleted yet) belong to it again.
+            forgetReceiptPurge(ownerUid, id);
+            setDoc(docRef, dataToRestore).catch((err) => setAppError(friendlyDbError(err)));
+          },
+          onExpire: () => purgeReceipts(ownerUid, id),
+        });
+      } else {
+        purgeReceipts(ownerUid, id);
+      }
+    } catch (err) {
+      setAppError(friendlyDbError(err));
+    }
+  });
 }
 
 function updateNoteSuggestions() {
@@ -4740,43 +4783,7 @@ function wireEvents() {
     const action = btn.dataset.action;
     const id = btn.dataset.id;
     if (action === "delete-tx") {
-      setAppError("");
-      const ok = await showConfirmToast(t("Delete this record?"));
-      if (!ok) return;
-
-      await withDisabled(btn, async () => {
-        try {
-          const { transactions: txCol } = userCollections(uid);
-          const docRef = doc(txCol, id);
-
-          let backup = transactions.find((t) => t.id === id) || null;
-          if (!backup) {
-            const snap = await getDoc(docRef);
-            backup = snap.exists() ? { id: snap.id, ...snap.data() } : null;
-          }
-
-          deleteTransactionById(id);
-
-          const ownerUid = uid;
-          if (backup) {
-            const dataToRestore = stripUndefined({ ...backup });
-            delete dataToRestore.id;
-            showUndoToast({
-              message: t("Record deleted. Undo?"),
-              onUndo: async () => {
-                // Same id, so the photos (not deleted yet) belong to it again.
-                forgetReceiptPurge(ownerUid, id);
-                setDoc(docRef, dataToRestore).catch((err) => setAppError(friendlyDbError(err)));
-              },
-              onExpire: () => purgeReceipts(ownerUid, id),
-            });
-          } else {
-            purgeReceipts(ownerUid, id);
-          }
-        } catch (err) {
-          setAppError(friendlyDbError(err));
-        }
-      });
+      await deleteRecordWithUndo(id, btn);
       return;
     }
     if (action === "edit-tx") {
@@ -4898,11 +4905,13 @@ function wireEvents() {
     });
   }
   // A budget's records: Edit opens the same form as the record list, over this list,
-  // which stays open and shows the change once saved.
+  // which stays open and shows the change once saved; Delete works as in the record
+  // list (asks first, then offers Undo).
   if (els.budgetRecordsTbody) {
     els.budgetRecordsTbody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-action='edit-tx']");
-      if (btn) openEditModal(btn.dataset.id);
+      const btn = e.target.closest("button[data-action]");
+      if (btn?.dataset.action === "edit-tx") openEditModal(btn.dataset.id);
+      else if (btn?.dataset.action === "delete-tx") deleteRecordWithUndo(btn.dataset.id, btn);
     });
   }
 
