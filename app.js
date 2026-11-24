@@ -2055,7 +2055,7 @@ function renderBudgetRecordsModal(category) {
 
   if (total === 0) {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td colspan="4" class="muted">${term || dateFilter ? t("No matching records.") : t("No records in this budget range yet.")}</td>`;
+    tr.innerHTML = `<td colspan="5" class="muted">${term || dateFilter ? t("No matching records.") : t("No records in this budget range yet.")}</td>`;
     els.budgetRecordsTbody.appendChild(tr);
     return;
   }
@@ -2073,6 +2073,11 @@ function renderBudgetRecordsModal(category) {
       <td data-label="${escapeHtml(t("Type"))}">${escapeHtml(typeLabel)}</td>
       <td class="right ${amountClass}" data-label="${escapeHtml(t("Amount"))}">${escapeHtml(money(tx.amount))}</td>
       <td data-label="${escapeHtml(t("Note"))}">${escapeHtml(tx.note || "")}</td>
+      <td>
+        <div class="row-actions">
+          <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${escapeHtml(tx.id)}">${escapeHtml(t("Edit"))}</button>
+        </div>
+      </td>
     `;
     els.budgetRecordsTbody.appendChild(tr);
   }
@@ -2132,7 +2137,9 @@ async function saveEditModal() {
   const categoryName = category ? category.name : "(Unknown)";
   const { transactions: txCol } = userCollections(uid);
 
-  await setDoc(doc(txCol, editingTransactionId), {
+  // Not awaited: offline, a write only settles once the server has it, and the form
+  // stayed open until then. The lists show the change at once from the local copy.
+  setDoc(doc(txCol, editingTransactionId), {
     categoryId,
     categoryName,
     type,
@@ -2142,7 +2149,7 @@ async function saveEditModal() {
     tags,
     dateISO,
     updatedAt: serverTimestamp(),
-  }, { merge: true });
+  }, { merge: true }).catch((err) => setAppError(friendlyDbError(err)));
 
   closeEditModal();
 }
@@ -3104,14 +3111,16 @@ function wireAssistantEvents() {
   // Escape closes the panel
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") {
+      // The edit form can sit over a budget's records: close just the form.
+      if (els.editTxModal && !els.editTxModal.hidden) {
+        closeEditModal();
+        return;
+      }
       if (els.assistantPanel && !els.assistantPanel.hidden) {
         toggleAssistantPanel(false);
       }
       if (els.budgetRecordsModal && !els.budgetRecordsModal.hidden) {
         closeBudgetRecordsModal();
-      }
-      if (els.editTxModal && !els.editTxModal.hidden) {
-        closeEditModal();
       }
       if (els.receiptModal && !els.receiptModal.hidden) {
         closeReceiptModal();
@@ -4886,6 +4895,14 @@ function wireEvents() {
   if (els.budgetRecordsModal) {
     els.budgetRecordsModal.addEventListener("click", (e) => {
       if (e.target === els.budgetRecordsModal) closeBudgetRecordsModal();
+    });
+  }
+  // A budget's records: Edit opens the same form as the record list, over this list,
+  // which stays open and shows the change once saved.
+  if (els.budgetRecordsTbody) {
+    els.budgetRecordsTbody.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-action='edit-tx']");
+      if (btn) openEditModal(btn.dataset.id);
     });
   }
 

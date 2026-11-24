@@ -1,4 +1,4 @@
-const CACHE_NAME = "accountbook-v29";
+const CACHE_NAME = "accountbook-v30";
 const CDN_CACHE = "accountbook-cdn-v16";
 // The app shell is cached as "./", never "./index.html": Vercel (cleanUrls) answers
 // /index.html with a 308 to /, and a page load can't be answered with a cached
@@ -12,7 +12,7 @@ const NAV_TIMEOUT_MS = 800;
 const PRECACHE = [
   SHELL,
   "./styles.css?v=17",
-  "./app.js?v=21",
+  "./app.js?v=22",
   "./js/boot.js?v=2",
   "./utils.js?v=7",
   "./firebase.js?v=7",

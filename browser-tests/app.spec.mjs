@@ -163,6 +163,76 @@ test("budgets: per-month amounts, rounding, refunds", async () => {
   check.done();
 });
 
+test("budget records: edit a record right from a budget's list", async () => {
+  const check = checks();
+  const { ctx, page, errors } = await openApp(browser, base, { seed: [
+    [U + "settings/preferences", { currencySymbol: "RM" }],
+    cat("food", "Food", { budget: 600, monthlyBudgets: { "2026-10": 600 } }),
+    cat("shop", "Shop"),
+    tx("t1", "food", 12, "expense", "2026-10-30", { categoryName: "Food", note: "lunch" }),
+    tx("t2", "food", 30, "expense", "2026-10-02", { categoryName: "Food", note: "dinner" }),
+  ] });
+  const list = () => page.evaluate(() => ({
+    open: !document.getElementById("budgetRecordsModal").hidden,
+    editing: !document.getElementById("editTxModal").hidden,
+    rows: [...document.querySelectorAll("#budgetRecordsTbody tr")].map((tr) => tr.innerText.replace(/\s+/g, " ").trim()),
+    summary: document.getElementById("budgetRecordsSummary").innerText.replace(/\s+/g, " "),
+  }));
+  const edit = (note) => page.locator("#budgetRecordsTbody tr", { hasText: note }).locator("button[data-action='edit-tx']").click({ timeout: 5000 });
+  try {
+    await view(page, "budget"); await settle(page, 300);
+    await page.click('tr[data-category-id="food"] td:first-child');
+    let s = await list();
+    const buttons = await page.locator("#budgetRecordsTbody button[data-action='edit-tx']").count();
+    check("each record in the budget's list has an Edit button", s.open && s.rows.length === 2 && buttons === 2, JSON.stringify(s.rows));
+
+    await edit("lunch");
+    await settle(page, 400); // on a phone the form slides up from below the screen first
+    const form = await page.evaluate(() => {
+      const box = document.querySelector("#editTxModal .edit-modal").getBoundingClientRect();
+      const top = document.elementFromPoint(box.left + box.width / 2, box.top + 20);
+      return {
+        onTop: !!top && document.getElementById("editTxModal").contains(top),
+        category: document.getElementById("editTxCategory").value, amount: document.getElementById("editTxAmount").value,
+        note: document.getElementById("editTxNote").value, date: document.getElementById("editTxDate").value,
+      };
+    });
+    check("Edit opens the record's form over the budget's list", form.onTop && (await list()).open, JSON.stringify(form));
+    check("the form holds that record", form.category === "food" && form.amount === "12.00" && form.note === "lunch" && form.date === "2026-10-30", JSON.stringify(form));
+
+    await page.fill("#editTxAmount", "1550");
+    await page.fill("#editTxNote", "lunch with Ali");
+    await page.click("#editTxSaveBtn");
+    await settle(page, 300);
+    s = await list();
+    const t1 = (await docs(page, U + "transactions/")).t1;
+    check("saved: the record is changed", t1.amount === 15.5 && t1.note === "lunch with Ali", JSON.stringify(t1));
+    check("the form closes and the budget's list stays open, showing the change", !s.editing && s.open && s.rows.some((r) => r.includes("RM15.50") && r.includes("lunch with Ali")), JSON.stringify(s.rows));
+    check("the budget's totals follow (RM15.50 + RM30.00 spent)", s.summary.includes("RM45.50"), s.summary);
+
+    await edit("dinner");
+    await page.keyboard.press("Escape");
+    s = await list();
+    check("Escape closes just the form, back to the budget's list", !s.editing && s.open, JSON.stringify(s));
+
+    // Offline the save only settles once the server has it: the form must not wait for that.
+    await page.evaluate(() => { window.__OFFLINE = true; });
+    await edit("dinner");
+    await page.selectOption("#editTxCategory", "shop");
+    await page.click("#editTxSaveBtn");
+    await settle(page, 300);
+    s = await list();
+    check("offline: Save still closes the form", !s.editing && s.open, JSON.stringify(s));
+    check("a record moved to another category leaves this budget's list", s.rows.length === 1 && !s.rows.some((r) => r.includes("dinner")), JSON.stringify(s.rows));
+    await page.keyboard.press("Escape");
+    check("Escape again closes the budget's list", !(await list()).open);
+    check("no page errors", errors.length === 0, errors.join(" | "));
+  } finally {
+    await ctx.close();
+  }
+  check.done();
+});
+
 // ── Deleting with Undo ──────────────────────────────────────────────────────
 
 test("delete + Undo keeps a record's photos; they go once Undo expires", async () => {
