@@ -175,6 +175,7 @@ const els = {
   editTxDate: document.getElementById("editTxDate"),
   editTxSaveBtn: document.getElementById("editTxSaveBtn"),
   editTxCancelBtn: document.getElementById("editTxCancelBtn"),
+  editTxDeleteBtn: document.getElementById("editTxDeleteBtn"),
   closeEditModal: document.getElementById("closeEditModal"),
 
   budgetRecordsModal: document.getElementById("budgetRecordsModal"),
@@ -2067,18 +2068,17 @@ function renderBudgetRecordsModal(category) {
     const tr = document.createElement("tr");
     const typeLabel = tx.type === "expense" ? t("Expense") : t("Revenue");
     const amountClass = tx.type === "expense" ? "val-negative" : "val-positive";
+    // Tapping the record opens its edit form (Save / Delete there).
+    tr.className = "clickable-row";
+    tr.dataset.id = tx.id;
+    tr.tabIndex = 0;
 
     tr.innerHTML = `
       <td data-label="${escapeHtml(t("Date"))}">${escapeHtml(tx.dateISO || "")}</td>
       <td data-label="${escapeHtml(t("Type"))}">${escapeHtml(typeLabel)}</td>
       <td class="right ${amountClass}" data-label="${escapeHtml(t("Amount"))}">${escapeHtml(money(tx.amount))}</td>
       <td data-label="${escapeHtml(t("Note"))}">${escapeHtml(tx.note || "")}</td>
-      <td>
-        <div class="row-actions">
-          <button class="btn btn-small" type="button" data-action="edit-tx" data-id="${escapeHtml(tx.id)}">${escapeHtml(t("Edit"))}</button>
-          <button class="btn btn-danger btn-small" type="button" data-action="delete-tx" data-id="${escapeHtml(tx.id)}">${escapeHtml(t("Delete"))}</button>
-        </div>
-      </td>
+      <td class="row-go" aria-hidden="true">${icon("edit", "icon-sm")}</td>
     `;
     els.budgetRecordsTbody.appendChild(tr);
   }
@@ -2224,11 +2224,12 @@ function deleteTransactionById(txId) {
 }
 
 // Delete a record once the user confirms, with Undo for a few seconds; its photos go
-// when Undo expires. Used by the record list and by a budget's records.
-async function deleteRecordWithUndo(id, btn) {
+// when Undo expires. Used by the record list and by the edit form.
+async function deleteRecordWithUndo(id, btn, { onConfirm } = {}) {
   setAppError("");
   const ok = await showConfirmToast(t("Delete this record?"));
   if (!ok) return;
+  onConfirm?.();
 
   await withDisabled(btn, async () => {
     try {
@@ -4904,14 +4905,27 @@ function wireEvents() {
       if (e.target === els.budgetRecordsModal) closeBudgetRecordsModal();
     });
   }
-  // A budget's records: Edit opens the same form as the record list, over this list,
-  // which stays open and shows the change once saved; Delete works as in the record
-  // list (asks first, then offers Undo).
+  // A budget's records: tapping one opens the same edit form as the record list, over
+  // this list, which stays open and shows the change once saved or deleted.
   if (els.budgetRecordsTbody) {
     els.budgetRecordsTbody.addEventListener("click", (e) => {
-      const btn = e.target.closest("button[data-action]");
-      if (btn?.dataset.action === "edit-tx") openEditModal(btn.dataset.id);
-      else if (btn?.dataset.action === "delete-tx") deleteRecordWithUndo(btn.dataset.id, btn);
+      const row = e.target.closest("tr[data-id]");
+      if (row) openEditModal(row.dataset.id);
+    });
+    els.budgetRecordsTbody.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter" && e.key !== " ") return;
+      const row = e.target.closest("tr[data-id]");
+      if (!row) return;
+      e.preventDefault();
+      openEditModal(row.dataset.id);
+    });
+  }
+  // Delete in the edit form: asks first; once confirmed the form closes, the record
+  // goes and Undo is offered, as in the record list.
+  if (els.editTxDeleteBtn) {
+    els.editTxDeleteBtn.addEventListener("click", () => {
+      const id = editingTransactionId;
+      if (id) deleteRecordWithUndo(id, els.editTxDeleteBtn, { onConfirm: closeEditModal });
     });
   }
 
